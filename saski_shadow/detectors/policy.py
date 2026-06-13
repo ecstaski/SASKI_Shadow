@@ -2,7 +2,7 @@
 
 Evaluates a single turn against rules supplied entirely by the integrator.
 There is no built-in statute logic, jurisdiction database, or default rule
-set in this module. A built-in US AI law database is coming soon.
+set in this module.
 
 Policy input is a plain Python dict only. To keep the package at zero runtime
 dependencies, this module never reads YAML. If you keep policies in YAML,

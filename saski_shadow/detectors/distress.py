@@ -4,10 +4,10 @@ This module provides a conservative public baseline distress indicator list.
 It is not clinical crisis detection and must not be used as the sole safety
 layer for any regulated deployment.
 
-The indicator phrases below are generic, plain-language help-seeking
-expressions of the kind described in publicly available mental health first
-aid guidance and academic literature. The list contains nothing proprietary
-and encodes no thresholds, weights, or semantic anchors.
+The baseline list below uses synthetic tokens only. Real indicator content
+is supplied by integrators via ``extra_indicators`` or by the licensed
+SASKI engine. The list contains nothing proprietary and encodes no
+algorithmic thresholds or weights.
 
 Outcome behavior (baseline): a distress phrase match alone never blocks. When
 ``escalation_detected`` is True and no policy rule or PII block applies, the
@@ -19,18 +19,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-# Generic, plain-language help-seeking indicators. Integrators may extend this
-# list with their own phrases via the ``extra_indicators`` argument.
+# Phrase list intentionally uses synthetic tokens. Real indicator content is
+# supplied by integrators via the extra_indicators parameter or by the
+# licensed SASKI engine.
 _BASELINE_INDICATORS = (
-    "i want to hurt myself",
-    "i want to harm myself",
-    "i want to end it",
-    "i can't go on",
-    "i feel hopeless",
-    "i have no reason to live",
-    "i don't want to be here anymore",
-    "thoughts of suicide",
-    "self harm",
+    "synthetic-distress-token-alpha",
+    "synthetic-distress-token-beta",
+    "synthetic-distress-token-gamma",
 )
 
 

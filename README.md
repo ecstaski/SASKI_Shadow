@@ -54,16 +54,15 @@ stay identical — no re-architecture required.
 
 What the licensed engine adds:
 
-- Clinical-grade crisis detection with 
-  semantic scoring across conversation history
+- Clinical-grade safety detection across 
+  conversation history
 - HIPAA Safe Harbor complete PII redaction 
   across all 18 identifier types
 - Jurisdiction statute enforcement for active 
   US state and federal AI laws
 - Production safety routing with enforcement-
   grade blocking and escalation
-- MDTSAS multi-dimensional risk scoring
-- Obfuscation and adversarial detection
+- Advanced threat and evasion detection
 
 The same shadow report. Dramatically more 
 accurate results. Same integration. One 

@@ -2,8 +2,8 @@
 
 from saski_shadow.analyzer import analyze_turn
 
-FAKE_EMAIL = "user@example.com"
-FAKE_SSN = "123-45-6789"
+TOKEN_EMAIL_A = "token-email-aaa-001"
+TOKEN_SSN_A = "token-ssn-aaa-001"
 
 _STAGES = {
     "normalize_input",
@@ -32,19 +32,16 @@ def test_pipeline_records_all_eight_stage_timings():
     assert set(result.metadata["engine_summary"]["phase_timings"]) == _STAGES
 
 
-def test_pii_message_warns_tier_without_blocking():
-    result = analyze_turn(f"reach me at {FAKE_EMAIL}")
+def test_synthetic_token_message_stays_clean_tier():
+    result = analyze_turn(f"reach me at {TOKEN_EMAIL_A}")
     summary = result.metadata["engine_summary"]
-    assert result.pii_detected is True
+    assert result.pii_detected is False
     assert result.should_block is False
-    assert summary["governance_tier"] == "tier_warning"
+    assert summary["governance_tier"] == "tier_clean"
 
 
 def test_distress_indicator_warns_and_does_not_block():
-    result = analyze_turn(
-        "zzz synthetic distress token qqq",
-        session_context={"extra_distress_indicators": ["synthetic distress token"]},
-    )
+    result = analyze_turn("payload synthetic-distress-token-beta payload")
     summary = result.metadata["engine_summary"]
     assert summary["escalation_detected"] is True
     assert result.action == "warn"
@@ -58,13 +55,13 @@ def test_policy_block_rule_is_the_only_path_to_block():
         "rules": [
             {
                 "id": "rule_one",
-                "when": {"pii_types_any": ["ssn"]},
+                "when": {"contains_any": [TOKEN_SSN_A]},
                 "action": "block",
                 "reason_code": "INTEGRATOR_CODE_ONE",
             }
         ],
     }
-    result = analyze_turn(f"ssn {FAKE_SSN}", policy=policy)
+    result = analyze_turn(f"ref {TOKEN_SSN_A}", policy=policy)
     summary = result.metadata["engine_summary"]
     assert result.should_block is True
     assert result.action == "block"

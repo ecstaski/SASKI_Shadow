@@ -29,6 +29,19 @@ _ALLOWED_RISK_BANDS = {"low", "moderate", "elevated", "critical"}
 _ALLOWED_TIERS = {"tier_clean", "tier_warning", "tier_escalation"}
 _PUBLIC_OUTCOMES = {o.value for o in PublicOutcome}
 
+# Only these phase_timing keys may pass through from a licensed engine result.
+_PHASE_TIMING_ALLOWLIST = frozenset({
+    "normalize_input_ms",
+    "detect_pii_ms",
+    "detect_distress_ms",
+    "evaluate_policy_ms",
+    "review_output_ms",
+    "decide_outcome_ms",
+    "sanitize_egress_ms",
+    "build_evidence_ms",
+    "total_ms",
+})
+
 # Public schema field allowlists for opaque passthrough blocks.
 _ENVELOPE_FIELDS = (
     "envelope_version",
@@ -111,8 +124,11 @@ def _coerce_phase_timings(value: Any) -> dict[str, float]:
         return {}
     timings: dict[str, float] = {}
     for key, val in value.items():
+        key_str = str(key)
+        if key_str not in _PHASE_TIMING_ALLOWLIST:
+            continue
         if isinstance(val, (int, float)) and not isinstance(val, bool):
-            timings[str(key)] = float(val)
+            timings[key_str] = float(val)
     return timings
 
 
