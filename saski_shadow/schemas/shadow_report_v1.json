@@ -1,0 +1,500 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.saski.dev/shadow-report/v1",
+  "title": "SASKI Shadow Pilot Report v1",
+  "type": "object",
+  "required": ["schema_version", "generated_at_utc", "period", "sections"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "shadow_report_v1"
+    },
+    "generated_at_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "period": {
+      "type": "object",
+      "required": ["start_utc", "end_utc"],
+      "properties": {
+        "start_utc": { "type": ["string", "null"], "format": "date-time" },
+        "end_utc": { "type": ["string", "null"], "format": "date-time" }
+      }
+    },
+    "sections": {
+      "type": "object",
+      "required": [
+        "pii_phi_detection_summary",
+        "compliance_exposure_examples",
+        "token_savings_calculation",
+        "envelope_evidence_sample",
+        "escalation_signal_count",
+        "unsafe_flow_documentation",
+        "latency_impact_report",
+        "recommended_path"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "pii_phi_detection_summary": { "$ref": "#/$defs/pii_phi_detection_summary" },
+        "compliance_exposure_examples": { "$ref": "#/$defs/compliance_exposure_examples" },
+        "token_savings_calculation": { "$ref": "#/$defs/token_savings_calculation" },
+        "envelope_evidence_sample": { "$ref": "#/$defs/envelope_evidence_sample" },
+        "escalation_signal_count": { "$ref": "#/$defs/escalation_signal_count" },
+        "unsafe_flow_documentation": { "$ref": "#/$defs/unsafe_flow_documentation" },
+        "latency_impact_report": { "$ref": "#/$defs/latency_impact_report" },
+        "recommended_path": { "$ref": "#/$defs/recommended_path" }
+      }
+    }
+  },
+  "$defs": {
+    "hash64": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "hash32_64": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{32,64}$"
+    },
+    "public_outcome": {
+      "type": "string",
+      "enum": [
+        "allow",
+        "warn",
+        "block",
+        "human_review",
+        "crisis_referral",
+        "physical_emergency_referral"
+      ]
+    },
+    "risk_band": {
+      "type": "string",
+      "enum": ["low", "moderate", "elevated", "critical"]
+    },
+    "pii_phi_detection_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["section", "totals", "by_pii_type", "history_redaction", "examples"],
+      "properties": {
+        "section": { "type": "string", "const": "pii_phi_detection_summary" },
+        "period": {
+          "type": "object",
+          "properties": {
+            "start_utc": { "type": ["string", "null"] },
+            "end_utc": { "type": ["string", "null"] }
+          }
+        },
+        "totals": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "turns_processed": { "type": "integer", "minimum": 0 },
+            "turns_with_pii": { "type": "integer", "minimum": 0 },
+            "pii_detection_rate": { "type": "number", "minimum": 0 }
+          }
+        },
+        "by_pii_type": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "ssn": { "type": "integer", "minimum": 0 },
+            "phone": { "type": "integer", "minimum": 0 },
+            "email": { "type": "integer", "minimum": 0 },
+            "name": { "type": "integer", "minimum": 0 },
+            "date_of_birth": { "type": "integer", "minimum": 0 },
+            "insurance_id": { "type": "integer", "minimum": 0 },
+            "address": { "type": "integer", "minimum": 0 },
+            "credit_card": { "type": "integer", "minimum": 0 },
+            "other": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "history_redaction": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sessions_with_history_pii": { "type": "integer", "minimum": 0 },
+            "aggregate_pii_types_found": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "examples": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "turn_index": { "type": "integer", "minimum": 0 },
+              "session_id": { "type": "string" },
+              "pii_types": { "type": "array", "items": { "type": "string" } },
+              "input_hash": { "$ref": "#/$defs/hash64" },
+              "redaction_applied": { "type": "boolean" },
+              "message_for_llm_hash": { "$ref": "#/$defs/hash32_64" }
+            }
+          }
+        }
+      }
+    },
+    "compliance_exposure_examples": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["section", "jurisdiction_config", "examples", "aggregate"],
+      "properties": {
+        "section": { "type": "string", "const": "compliance_exposure_examples" },
+        "disclaimer": { "type": "string" },
+        "upgrade_path": { "type": "string" },
+        "jurisdiction_config": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "active_jurisdictions": { "type": "array", "items": { "type": "string" } },
+            "user_jurisdiction_injected": { "type": "boolean" }
+          }
+        },
+        "examples": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "turn_index": { "type": "integer", "minimum": 0 },
+              "session_id": { "type": "string" },
+              "deployment_profile": { "type": ["string", "null"] },
+              "user_jurisdiction": { "type": ["string", "null"] },
+              "jurisdiction_source": {
+                "type": ["string", "null"],
+                "enum": ["integrator_supplied", "not_provided", "unknown", null]
+              },
+              "obligation_label": { "type": ["string", "null"] },
+              "reason_code": { "type": ["string", "null"] },
+              "compliance_decisions": {
+                "type": "object",
+                "additionalProperties": true
+              },
+              "engine_outcome": { "$ref": "#/$defs/public_outcome" },
+              "would_have_blocked_in_enforce": { "type": "boolean" },
+              "enforcement_suppressed_in_shadow": { "type": "boolean" }
+            }
+          }
+        },
+        "aggregate": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "turns_with_compliance_decisions": { "type": "integer", "minimum": 0 },
+            "turns_with_jurisdiction_decision": { "type": "integer", "minimum": 0 },
+            "unique_reason_codes": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "token_savings_calculation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["section", "prospect_inputs", "measured_from_shadow", "token_model", "savings"],
+      "properties": {
+        "section": { "type": "string", "const": "token_savings_calculation" },
+        "upgrade_path": { "type": "string" },
+        "prospect_inputs": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "avg_tokens_per_session_legacy_system": { "type": ["number", "null"] },
+            "avg_llm_turns_per_session": { "type": ["number", "null"] },
+            "monthly_sessions": { "type": ["number", "null"] },
+            "input_price_per_1m_tokens_usd": { "type": ["number", "null"] }
+          }
+        },
+        "measured_from_shadow": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "total_turns": { "type": "integer", "minimum": 0 },
+            "tier_clean_turns": { "type": "integer", "minimum": 0 },
+            "tier_warning_turns": { "type": "integer", "minimum": 0 },
+            "tier_escalation_turns": { "type": "integer", "minimum": 0 },
+            "blocked_llm_turns": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "token_model": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "legacy_system_tokens_per_turn": { "type": ["number", "null"] },
+            "governed_system_tokens_per_turn": { "type": ["number", "null"] },
+            "warning_append_tokens": { "type": ["number", "null"] },
+            "regulated_floor_tokens": { "type": ["number", "null"] }
+          }
+        },
+        "savings": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tokens_saved_per_session_estimate": { "type": ["number", "null"] },
+            "monthly_tokens_saved_estimate": { "type": ["number", "null"] },
+            "annual_usd_saved_estimate": { "type": ["number", "null"] }
+          }
+        }
+      }
+    },
+    "envelope_evidence_sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["section", "samples"],
+      "properties": {
+        "section": { "type": "string", "const": "envelope_evidence_sample" },
+        "samples": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "turn_index": { "type": "integer", "minimum": 0 },
+              "session_id": { "type": "string" },
+              "mode_tag": {
+                "type": "string",
+                "enum": ["saski_on", "saski_off", "shadow_mode", "warn_mode"]
+              },
+              "envelope": { "type": "object", "additionalProperties": true },
+              "transport_audit_record": { "type": "object", "additionalProperties": true }
+            }
+          }
+        }
+      }
+    },
+    "escalation_signal_count": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["section", "totals", "by_governance_tier", "by_outcome", "by_risk_band", "examples"],
+      "properties": {
+        "section": { "type": "string", "const": "escalation_signal_count" },
+        "disclaimer": { "type": "string" },
+        "upgrade_path": { "type": "string" },
+        "totals": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "turns_processed": { "type": "integer", "minimum": 0 },
+            "escalation_turns": { "type": "integer", "minimum": 0 },
+            "escalation_rate": { "type": "number", "minimum": 0 }
+          }
+        },
+        "by_governance_tier": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tier_clean": { "type": "integer", "minimum": 0 },
+            "tier_warning": { "type": "integer", "minimum": 0 },
+            "tier_escalation": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "by_outcome": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "allow": { "type": "integer", "minimum": 0 },
+            "warn": { "type": "integer", "minimum": 0 },
+            "block": { "type": "integer", "minimum": 0 },
+            "human_review": { "type": "integer", "minimum": 0 },
+            "crisis_referral": { "type": "integer", "minimum": 0 },
+            "physical_emergency_referral": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "by_risk_band": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "low": { "type": "integer", "minimum": 0 },
+            "moderate": { "type": "integer", "minimum": 0 },
+            "elevated": { "type": "integer", "minimum": 0 },
+            "critical": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "examples": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "turn_index": { "type": "integer", "minimum": 0 },
+              "session_id": { "type": "string" },
+              "escalation_detected": { "type": "boolean" },
+              "outcome": { "$ref": "#/$defs/public_outcome" },
+              "risk_band": { "$ref": "#/$defs/risk_band" },
+              "input_hash": { "$ref": "#/$defs/hash64" },
+              "llm_egress_suppressed": { "type": "boolean" },
+              "shadow_actual_llm_response_hash": { "$ref": "#/$defs/hash64" }
+            }
+          }
+        }
+      }
+    },
+    "unsafe_flow_documentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["section", "categories", "examples"],
+      "properties": {
+        "section": { "type": "string", "const": "unsafe_flow_documentation" },
+        "categories": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enforcement_would_block",
+            "policy_boundary_failure",
+            "content_sanitization_gap",
+            "integrator_override",
+            "manual_review_required",
+            "other"
+          ],
+          "properties": {
+            "enforcement_would_block": { "type": "array", "items": { "type": "object" } },
+            "policy_boundary_failure": { "type": "array", "items": { "type": "object" } },
+            "content_sanitization_gap": { "type": "array", "items": { "type": "object" } },
+            "integrator_override": { "type": "array", "items": { "type": "object" } },
+            "manual_review_required": { "type": "array", "items": { "type": "object" } },
+            "other": { "type": "array", "items": { "type": "object" } }
+          }
+        },
+        "examples": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "turn_index": { "type": "integer", "minimum": 0 },
+              "session_id": { "type": "string" },
+              "category": {
+                "type": "string",
+                "enum": [
+                  "enforcement_would_block",
+                  "policy_boundary_failure",
+                  "content_sanitization_gap",
+                  "integrator_override",
+                  "manual_review_required",
+                  "other"
+                ]
+              },
+              "signals": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "enforcement_suppressed": { "type": "boolean" },
+                  "would_block": { "type": "boolean" },
+                  "outcome": { "$ref": "#/$defs/public_outcome" },
+                  "human_review_required": { "type": "boolean" }
+                }
+              },
+              "recommended_behavior": { "type": "string" },
+              "observed_llm_response_hash": { "$ref": "#/$defs/hash64" },
+              "analyst_note": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "latency_impact_report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["section", "targets", "aggregate", "phase_timings", "outliers"],
+      "properties": {
+        "section": { "type": "string", "const": "latency_impact_report" },
+        "targets": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "integrator_p95_target_ms": { "type": ["number", "null"] },
+            "hosted_p95_target_ms": { "type": ["number", "null"] }
+          }
+        },
+        "aggregate": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "turn_count": { "type": "integer", "minimum": 0 },
+            "p50_total_ms": { "type": "number", "minimum": 0 },
+            "p95_total_ms": { "type": "number", "minimum": 0 },
+            "p99_total_ms": { "type": "number", "minimum": 0 },
+            "exceeded_integrator_target_count": { "type": "integer", "minimum": 0 },
+            "exceeded_hosted_target_count": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "phase_timings": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "p50": { "type": "number", "minimum": 0 },
+              "p95": { "type": "number", "minimum": 0 },
+              "p99": { "type": "number", "minimum": 0 }
+            }
+          }
+        },
+        "outliers": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "turn_index": { "type": "integer", "minimum": 0 },
+              "session_id": { "type": "string" },
+              "total_ms": { "type": "number", "minimum": 0 },
+              "phase_timings": { "type": "object", "additionalProperties": true },
+              "exceeded_threshold": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    },
+    "recommended_path": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["section"],
+      "properties": {
+        "section": { "type": "string", "const": "recommended_path" },
+        "recommended_deployment_profile": { "type": ["string", "null"] },
+        "recommended_jurisdiction_config": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "active_jurisdictions": { "type": "array", "items": { "type": "string" } },
+            "require_user_jurisdiction": { "type": "boolean" }
+          }
+        },
+        "expected_production_tier_distribution": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "tier_clean_pct": { "type": "number", "minimum": 0 },
+            "tier_warning_pct": { "type": "number", "minimum": 0 },
+            "tier_escalation_pct": { "type": "number", "minimum": 0 }
+          }
+        },
+        "enforce_rollout": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "strategy": { "type": ["string", "null"] },
+            "subset_description": { "type": ["string", "null"] },
+            "estimated_days_to_full_enforce": { "type": ["number", "null"] }
+          }
+        },
+        "findings_summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "pii_risk": { "type": ["string", "null"] },
+            "escalation_signal_rate": { "type": ["string", "null"] },
+            "compliance_gaps": { "type": "array", "items": { "type": "string" } },
+            "latency_acceptable": { "type": "boolean" }
+          }
+        },
+        "next_steps": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

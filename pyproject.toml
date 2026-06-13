@@ -1,0 +1,60 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "saski-shadow"
+version = "0.1.0"
+description = "Shadow-mode evidence validation, aggregation, and export for SASKI integrations"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+authors = [
+  { name = "SASKI Institute PBC", email = "info@techviz.us" }
+]
+keywords = ["ai-safety", "shadow-mode", "audit", "evidence", "compliance"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.0",
+  "black>=23.0",
+  "ruff>=0.1.0",
+]
+sasi-sdk = [
+  "sasi-sdk>=1.6.4",
+]
+
+[project.scripts]
+saski-shadow = "saski_shadow.aggregate.report:main"
+
+[project.urls]
+Homepage = "https://mytrusted.ai"
+Repository = "https://github.com/mytrustedai/saski-shadow"
+Documentation = "https://github.com/mytrustedai/saski-shadow#readme"
+
+[tool.hatch.build.targets.wheel]
+packages = ["saski_shadow"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+
+[tool.black]
+line-length = 100
+target-version = ["py39", "py310", "py311", "py312"]
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4"]

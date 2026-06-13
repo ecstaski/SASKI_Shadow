@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.saski.dev/transport-audit/v1",
+  "title": "SASKI Shadow Transport Audit Record v1",
+  "type": "object",
+  "required": [
+    "record_version",
+    "run_id",
+    "enforcement_mode",
+    "pii_detected",
+    "redaction_applied",
+    "message_for_llm_hash",
+    "artifact_hash"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "record_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "enforcement_mode": {
+      "type": "string",
+      "enum": ["enforce", "shadow", "warn"]
+    },
+    "jurisdiction_source": {
+      "type": ["string", "null"],
+      "enum": ["integrator_supplied", "not_provided", "unknown", null],
+      "description": "How user jurisdiction was supplied; neutral public enum only"
+    },
+    "pii_detected": {
+      "type": "boolean"
+    },
+    "pii_types": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "ssn", "phone", "email", "name", "date_of_birth",
+          "insurance_id", "address", "credit_card", "account",
+          "device", "ip", "url", "biometric", "other"
+        ]
+      },
+      "default": []
+    },
+    "redaction_applied": {
+      "type": "boolean"
+    },
+    "message_for_llm_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32,64}$",
+      "description": "Hash of governed LLM egress payload"
+    },
+    "artifact_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32,64}$",
+      "description": "Hash of this audit record payload"
+    },
+    "prev_artifact_hash": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{32,64}$",
+      "description": "Previous record hash in per-session chain, or null for first turn"
+    },
+    "violation_events": {
+      "type": "array",
+      "description": "Opaque violation summaries",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "default": []
+    }
+  }
+}

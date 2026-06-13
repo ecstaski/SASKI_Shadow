@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.saski.dev/envelope/v1",
+  "title": "SASKI Shadow Envelope v1",
+  "type": "object",
+  "required": [
+    "envelope_version",
+    "run_id",
+    "timestamp_utc",
+    "input_hash"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "envelope_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique turn/run identifier"
+    },
+    "policy_id": {
+      "type": ["string", "null"],
+      "description": "Pinned policy identifier supplied by engine"
+    },
+    "policy_hash": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 hex of pinned policy configuration"
+    },
+    "timestamp_utc": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 UTC timestamp of analysis"
+    },
+    "input_hash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 hex of analyzed input (no raw text)"
+    },
+    "output_hash": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA-256 hex of normalized model output when available"
+    },
+    "integrator_signature": {
+      "type": ["string", "null"],
+      "description": "Optional integrator-defined field. saski-shadow does not generate or verify this value. Provided so integrators may attach their own signing, notarization, or chain-of-custody mechanism."
+    },
+    "events": {
+      "type": "array",
+      "description": "Opaque event summaries; no internal event registry exposed",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "default": []
+    },
+    "invariant_summary": {
+      "type": "object",
+      "description": "Opaque invariant check summary",
+      "additionalProperties": true,
+      "default": {}
+    }
+  }
+}
