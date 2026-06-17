@@ -71,6 +71,19 @@
       "type": "string",
       "enum": ["low", "moderate", "elevated", "critical"]
     },
+    "starter_law": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["law_id", "jurisdiction", "domain", "citation", "effective_date", "note"],
+      "properties": {
+        "law_id": { "type": "string" },
+        "jurisdiction": { "type": "string" },
+        "domain": { "type": "string" },
+        "citation": { "type": "string" },
+        "effective_date": { "type": "string" },
+        "note": { "type": "string" }
+      }
+    },
     "pii_phi_detection_summary": {
       "type": "object",
       "additionalProperties": false,
@@ -139,7 +152,7 @@
     "compliance_exposure_examples": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["section", "jurisdiction_config", "examples", "aggregate"],
+      "required": ["section", "jurisdiction_config", "examples", "matched_laws", "law_match_summary", "aggregate"],
       "properties": {
         "section": { "type": "string", "const": "compliance_exposure_examples" },
         "disclaimer": { "type": "string" },
@@ -162,6 +175,7 @@
               "session_id": { "type": "string" },
               "deployment_profile": { "type": ["string", "null"] },
               "user_jurisdiction": { "type": ["string", "null"] },
+              "domain": { "type": ["string", "null"] },
               "jurisdiction_source": {
                 "type": ["string", "null"],
                 "enum": ["integrator_supplied", "not_provided", "unknown", null]
@@ -172,10 +186,41 @@
                 "type": "object",
                 "additionalProperties": true
               },
+              "matched_laws": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/starter_law" }
+              },
+              "observed_signals": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "pii_detected": { "type": "boolean" },
+                  "pii_types": { "type": "array", "items": { "type": "string" } },
+                  "escalation_detected": { "type": "boolean" },
+                  "outcome": {
+                    "type": ["string", "null"],
+                    "enum": ["allow", "warn", "block", "human_review", "crisis_referral", "physical_emergency_referral", null]
+                  }
+                }
+              },
               "engine_outcome": { "$ref": "#/$defs/public_outcome" },
               "would_have_blocked_in_enforce": { "type": "boolean" },
               "enforcement_suppressed_in_shadow": { "type": "boolean" }
             }
+          }
+        },
+        "matched_laws": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/starter_law" }
+        },
+        "law_match_summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "turns_with_jurisdiction_metadata": { "type": "integer", "minimum": 0 },
+            "turns_with_law_match": { "type": "integer", "minimum": 0 },
+            "unique_law_ids": { "type": "array", "items": { "type": "string" } },
+            "no_match_statement": { "type": ["string", "null"] }
           }
         },
         "aggregate": {

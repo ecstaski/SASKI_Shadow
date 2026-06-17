@@ -18,11 +18,13 @@ from datetime import datetime, timezone
 from typing import Any
 
 from ..enums import PublicOutcome
+from ..laws import match_laws
 
 # Required messaging strings.
 COMPLIANCE_DISCLAIMER = (
-    "Compliance exposure based on integrator-supplied policy rules. "
-    "A built-in US AI law database is coming soon."
+    "This report reflects a starter set of laws and will expand as coverage "
+    "grows. It does not apply private SASKI enforcement mappings, thresholds, "
+    "or internal policy logic."
 )
 UPGRADE_MESSAGE = (
     "For comprehensive results, add the licensed SASKI engine to your VPC deployment."
@@ -153,12 +155,32 @@ def _compliance_decisions(turn: dict[str, Any]) -> list[dict[str, Any]]:
     return []
 
 
+def _turn_jurisdiction(turn: dict[str, Any], prospect_inputs: dict[str, Any]) -> str | None:
+    # Precedence: explicit per-turn field, then engine_summary passthrough,
+    # then a single report-level fallback supplied by the integrator.
+    value = turn.get("jurisdiction") or _engine_summary(turn).get("user_jurisdiction")
+    if not value:
+        value = prospect_inputs.get("user_jurisdiction")
+    return str(value) if value else None
+
+
+def _turn_domain(turn: dict[str, Any], prospect_inputs: dict[str, Any]) -> str | None:
+    value = turn.get("domain") or _engine_summary(turn).get("domain")
+    if not value:
+        value = prospect_inputs.get("domain")
+    return str(value) if value else None
+
+
 def _section_compliance(turns: list[dict[str, Any]], prospect_inputs: dict[str, Any]) -> dict[str, Any]:
     examples: list[dict[str, Any]] = []
     reason_codes: set[str] = set()
     turns_with_compliance = 0
     turns_with_jurisdiction = 0
     user_jurisdiction_injected = False
+
+    turns_with_jurisdiction_metadata = 0
+    turns_with_law_match = 0
+    matched_laws_by_id: dict[str, dict[str, str]] = {}
 
     for turn in turns:
         summary = _engine_summary(turn)
@@ -169,38 +191,72 @@ def _section_compliance(turns: list[dict[str, Any]], prospect_inputs: dict[str, 
             turns_with_jurisdiction += 1
             user_jurisdiction_injected = True
 
+        # Named-law matching is keyed purely on integrator-supplied jurisdiction
+        # and domain. Signals are attached below as display context only; they
+        # never gate which law matches.
+        jurisdiction = _turn_jurisdiction(turn, prospect_inputs)
+        domain = _turn_domain(turn, prospect_inputs)
+        if jurisdiction and domain:
+            turns_with_jurisdiction_metadata += 1
+        matched = match_laws(jurisdiction, domain)
+        if matched:
+            turns_with_law_match += 1
+            for law in matched:
+                matched_laws_by_id[law["law_id"]] = law
+
         if decisions:
             turns_with_compliance += 1
             for decision in decisions:
                 code = decision.get("reason_code")
                 if code:
                     reason_codes.add(str(code))
-            if len(examples) < _MAX_EXAMPLES:
-                deployment = turn.get("deployment_decision") or {}
-                would_block = bool(summary.get("would_block"))
-                examples.append(
-                    {
-                        "turn_index": turn.get("turn_index", 0),
-                        "session_id": turn.get("session_id", ""),
-                        "deployment_profile": prospect_inputs.get("deployment_profile"),
-                        "user_jurisdiction": prospect_inputs.get("user_jurisdiction"),
-                        "jurisdiction_source": jurisdiction_source,
-                        "obligation_label": decisions[0].get("obligation_label"),
-                        "reason_code": decisions[0].get("reason_code"),
-                        "compliance_decisions": {
-                            str(d.get("rule_id", f"rule_{i}")): {
-                                "action": d.get("action"),
-                                "reason_code": d.get("reason_code"),
-                            }
-                            for i, d in enumerate(decisions)
-                        },
-                        "engine_outcome": summary.get("outcome"),
-                        "would_have_blocked_in_enforce": would_block,
-                        "enforcement_suppressed_in_shadow": bool(
-                            deployment.get("enforcement_suppressed", would_block)
-                        ),
-                    }
-                )
+
+        if (decisions or matched) and len(examples) < _MAX_EXAMPLES:
+            deployment = turn.get("deployment_decision") or {}
+            would_block = bool(summary.get("would_block"))
+            examples.append(
+                {
+                    "turn_index": turn.get("turn_index", 0),
+                    "session_id": turn.get("session_id", ""),
+                    "deployment_profile": prospect_inputs.get("deployment_profile"),
+                    "user_jurisdiction": jurisdiction,
+                    "domain": domain,
+                    "jurisdiction_source": jurisdiction_source,
+                    "obligation_label": decisions[0].get("obligation_label") if decisions else None,
+                    "reason_code": decisions[0].get("reason_code") if decisions else None,
+                    "compliance_decisions": {
+                        str(d.get("rule_id", f"rule_{i}")): {
+                            "action": d.get("action"),
+                            "reason_code": d.get("reason_code"),
+                        }
+                        for i, d in enumerate(decisions)
+                    },
+                    "matched_laws": matched,
+                    "observed_signals": {
+                        "pii_detected": bool(summary.get("pii_detected")),
+                        "pii_types": list(summary.get("pii_types") or []),
+                        "escalation_detected": bool(summary.get("escalation_detected")),
+                        "outcome": summary.get("outcome") if summary.get("outcome") in _OUTCOME_KEYS else None,
+                    },
+                    "engine_outcome": summary.get("outcome"),
+                    "would_have_blocked_in_enforce": would_block,
+                    "enforcement_suppressed_in_shadow": bool(
+                        deployment.get("enforcement_suppressed", would_block)
+                    ),
+                }
+            )
+
+    matched_laws = [matched_laws_by_id[k] for k in sorted(matched_laws_by_id)]
+    if matched_laws:
+        no_match_statement = None
+    elif turns_with_jurisdiction_metadata == 0:
+        no_match_statement = (
+            "No jurisdiction/domain metadata was supplied on any turn, so no laws were matched."
+        )
+    else:
+        no_match_statement = (
+            "No laws in the starter set matched the supplied jurisdiction/domain metadata."
+        )
 
     active = prospect_inputs.get("active_jurisdictions") or []
     return {
@@ -212,6 +268,13 @@ def _section_compliance(turns: list[dict[str, Any]], prospect_inputs: dict[str, 
             "user_jurisdiction_injected": user_jurisdiction_injected,
         },
         "examples": examples,
+        "matched_laws": matched_laws,
+        "law_match_summary": {
+            "turns_with_jurisdiction_metadata": turns_with_jurisdiction_metadata,
+            "turns_with_law_match": turns_with_law_match,
+            "unique_law_ids": [law["law_id"] for law in matched_laws],
+            "no_match_statement": no_match_statement,
+        },
         "aggregate": {
             "turns_with_compliance_decisions": turns_with_compliance,
             "turns_with_jurisdiction_decision": turns_with_jurisdiction,

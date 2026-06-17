@@ -13,7 +13,8 @@ HEX64_A = "a" * 64
 
 
 def _turn(idx, session_id, *, outcome="allow", tier="tier_clean", pii=False,
-          escalation=False, would_block=False, pii_types=None, latency=1.0):
+          escalation=False, would_block=False, pii_types=None, latency=1.0,
+          jurisdiction=None, domain=None):
     return {
         "turn_index": idx,
         "timestamp_utc": "2026-06-12T16:00:00+00:00",
@@ -32,6 +33,8 @@ def _turn(idx, session_id, *, outcome="allow", tier="tier_clean", pii=False,
             "would_block": would_block,
             "governance_tier": tier,
             "phase_timings": {"stage_one": 0.5, "stage_two": 0.5},
+            "user_jurisdiction": jurisdiction,
+            "domain": domain,
         },
     }
 
@@ -91,6 +94,54 @@ def test_counts_reflect_pii_and_escalation_turns():
     report = aggregate_shadow_report(_sample_turns())
     assert report["sections"]["pii_phi_detection_summary"]["totals"]["turns_with_pii"] == 1
     assert report["sections"]["escalation_signal_count"]["totals"]["escalation_turns"] == 1
+
+
+def test_section2_names_specific_laws_on_jurisdiction_domain_match():
+    turns = [
+        _turn(0, "sess_test_001", jurisdiction="US-CA", domain="healthcare"),
+        _turn(1, "sess_test_002", jurisdiction="US-NY-NYC", domain="employment"),
+    ]
+    section = aggregate_shadow_report(turns)["sections"]["compliance_exposure_examples"]
+    unique = set(section["law_match_summary"]["unique_law_ids"])
+    assert {"US-CA-AB3030-HEALTH", "US-CA-HEALTH-ADVICE-AI"}.issubset(unique)
+    assert "US-NYC-AEDT" in unique
+    assert section["law_match_summary"]["no_match_statement"] is None
+    # Each matched law carries fact-only fields including the citation.
+    first = section["matched_laws"][0]
+    assert set(first) == {"law_id", "jurisdiction", "domain", "citation", "effective_date", "note"}
+
+
+def test_section2_says_so_plainly_when_no_metadata_supplied():
+    section = aggregate_shadow_report(_sample_turns())["sections"]["compliance_exposure_examples"]
+    assert section["matched_laws"] == []
+    assert "No jurisdiction/domain metadata" in section["law_match_summary"]["no_match_statement"]
+
+
+def test_section2_no_match_when_metadata_present_but_nothing_matches():
+    turns = [_turn(0, "sess_test_001", jurisdiction="US-ZZ", domain="consumer_chatbot")]
+    section = aggregate_shadow_report(turns)["sections"]["compliance_exposure_examples"]
+    assert section["matched_laws"] == []
+    assert section["law_match_summary"]["turns_with_jurisdiction_metadata"] == 1
+    assert "did not" in section["law_match_summary"]["no_match_statement"] or \
+        "No laws" in section["law_match_summary"]["no_match_statement"]
+
+
+def test_section2_disclaimer_states_starter_set_and_no_private_logic():
+    section = aggregate_shadow_report(_sample_turns())["sections"]["compliance_exposure_examples"]
+    assert "starter set of laws" in section["disclaimer"]
+    assert "does not apply private SASKI enforcement" in section["disclaimer"]
+
+
+def test_section2_example_attaches_signals_as_context_not_as_match_key():
+    # PII present but matching still depends only on jurisdiction + domain.
+    turns = [
+        _turn(0, "sess_test_001", pii=True, pii_types=["email"],
+              jurisdiction="US-UT", domain="mental_health"),
+    ]
+    section = aggregate_shadow_report(turns)["sections"]["compliance_exposure_examples"]
+    example = section["examples"][0]
+    assert example["matched_laws"][0]["law_id"] == "US-UT-MENTAL-HEALTH-CHATBOT"
+    assert example["observed_signals"]["pii_detected"] is True
 
 
 def test_load_turns_jsonl_round_trip(tmp_path):

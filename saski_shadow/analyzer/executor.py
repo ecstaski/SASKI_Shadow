@@ -260,6 +260,12 @@ def analyze_turn(
 
     total_ms = (perf_counter() - started) * 1000.0
 
+    # Factual passthrough of integrator-supplied compliance context. These are
+    # not analyzed or interpreted here; they exist so the aggregator can match
+    # public laws by jurisdiction and domain downstream.
+    user_jurisdiction = session_context.get("user_jurisdiction")
+    domain = session_context.get("domain")
+
     engine_summary = {
         "outcome": outcome.value,
         "risk_band": risk_band,
@@ -269,6 +275,8 @@ def analyze_turn(
         "would_block": would_block,
         "governance_tier": tier,
         "phase_timings": timings,
+        "user_jurisdiction": str(user_jurisdiction) if user_jurisdiction else None,
+        "domain": str(domain) if domain else None,
     }
 
     metadata = {
