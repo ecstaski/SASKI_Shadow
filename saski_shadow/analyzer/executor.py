@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import unicodedata
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from time import perf_counter
 from typing import Any

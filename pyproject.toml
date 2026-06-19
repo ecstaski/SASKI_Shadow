@@ -32,7 +32,7 @@ dev = [
   "black>=23.0",
   "ruff>=0.1.0",
 ]
-sasi-sdk = [
+saski-sdk = [
   "sasi-sdk>=1.6.4",
 ]
 
@@ -57,4 +57,6 @@ target-version = ["py39", "py310", "py311", "py312"]
 
 [tool.ruff]
 line-length = 100
+
+[tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "C4"]

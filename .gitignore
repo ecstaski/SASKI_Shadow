@@ -9,3 +9,11 @@ build/
 .mypy_cache/
 .ruff_cache/
 .DS_Store
+
+# Editor backups and packed-repo / audit dumps (keep internals out of the tree)
+*.bak
+*_audit.txt
+repomix-output*
+
+# Integrator runtime turn stores (hash-only payloads, not source)
+*.jsonl

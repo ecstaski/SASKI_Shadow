@@ -74,13 +74,14 @@
     "starter_law": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["law_id", "jurisdiction", "domain", "citation", "effective_date", "note"],
+      "required": ["law_id", "jurisdiction", "domain", "citation", "effective_date", "date_added", "note"],
       "properties": {
         "law_id": { "type": "string" },
         "jurisdiction": { "type": "string" },
         "domain": { "type": "string" },
         "citation": { "type": "string" },
         "effective_date": { "type": "string" },
+        "date_added": { "type": "string" },
         "note": { "type": "string" }
       }
     },
@@ -113,7 +114,7 @@
             "ssn": { "type": "integer", "minimum": 0 },
             "phone": { "type": "integer", "minimum": 0 },
             "email": { "type": "integer", "minimum": 0 },
-            "name": { "type": "integer", "minimum": 0 },
+            "ip": { "type": "integer", "minimum": 0 },
             "date_of_birth": { "type": "integer", "minimum": 0 },
             "insurance_id": { "type": "integer", "minimum": 0 },
             "address": { "type": "integer", "minimum": 0 },
@@ -237,9 +238,14 @@
     "token_savings_calculation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["section", "prospect_inputs", "measured_from_shadow", "token_model", "savings"],
+      "required": ["section", "basis", "prospect_inputs", "measured_from_shadow", "token_model", "savings"],
       "properties": {
         "section": { "type": "string", "const": "token_savings_calculation" },
+        "basis": {
+          "type": "string",
+          "enum": ["estimated_from_integrator_inputs", "insufficient_inputs"]
+        },
+        "disclaimer": { "type": "string" },
         "upgrade_path": { "type": "string" },
         "prospect_inputs": {
           "type": "object",

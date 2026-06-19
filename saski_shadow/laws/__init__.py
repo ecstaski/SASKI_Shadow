@@ -10,6 +10,6 @@ The starter set is intentionally small and will expand as coverage grows.
 
 from __future__ import annotations
 
-from .starter import STARTER_LAWS, match_laws
+from .starter import STARTER_LAWS, coverage_summary, match_laws
 
-__all__ = ["STARTER_LAWS", "match_laws"]
+__all__ = ["STARTER_LAWS", "coverage_summary", "match_laws"]

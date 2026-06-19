@@ -33,13 +33,24 @@ ESCALATION_DISCLAIMER = (
     "Escalation counts reflect baseline distress phrase-list matches only and are "
     "not clinical crisis detection."
 )
+TOKEN_SAVINGS_DISCLAIMER = (
+    "Estimate only. Computed from integrator-supplied token-model and pricing "
+    "inputs using transparent arithmetic (observed tier counts x integrator "
+    "per-turn token figures x integrator unit price). It embeds no proprietary "
+    "SASKI prompt-assembly constants or hidden savings assumptions. Every output "
+    "is null unless the inputs it depends on are supplied."
+)
+
+# Section 3 basis labels: makes it explicit whether numbers were calculated.
+_TOKEN_BASIS_ESTIMATED = "estimated_from_integrator_inputs"
+_TOKEN_BASIS_INSUFFICIENT = "insufficient_inputs"
 
 _MAX_EXAMPLES = 10
 _PII_BUCKETS = (
     "ssn",
     "phone",
     "email",
-    "name",
+    "ip",
     "date_of_birth",
     "insurance_id",
     "address",
@@ -64,6 +75,19 @@ def load_turns_jsonl(path: str) -> list[dict[str, Any]]:
 
 def _now_utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _num(value: Any) -> float | None:
+    """Coerce an integrator-supplied numeric input to float, else None.
+
+    Booleans are rejected (``True``/``False`` are not valid token or price
+    figures even though they are ``int`` subclasses).
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
 
 
 def _engine_summary(turn: dict[str, Any]) -> dict[str, Any]:
@@ -287,6 +311,29 @@ def _section_token_savings(
     turns: list[dict[str, Any]],
     prospect_inputs: dict[str, Any],
 ) -> dict[str, Any]:
+    """Transparent, integrator-input-driven token-savings estimate.
+
+    No proprietary constants. The integrator supplies a per-turn token model
+    and pricing/volume figures; this function only counts observed turns by
+    governance tier and applies visible arithmetic. Any output whose required
+    inputs are missing stays ``None``.
+
+    Token model (all per LLM turn, integrator-supplied):
+      - ``legacy_system_tokens_per_turn`` (L): ungoverned baseline cost.
+      - ``governed_system_tokens_per_turn`` (G): governed cost on a clean turn.
+      - ``warning_append_tokens`` (W): extra tokens added on a warning turn
+        (defaults to 0 when the core model is supplied).
+      - ``regulated_floor_tokens`` (R): governed cost on an escalation turn
+        (defaults to G when not supplied).
+
+    Arithmetic:
+      governed_total = clean*G + warning*(G+W) + escalation*R
+      legacy_total   = total_turns * L
+      saved_total    = max(0, legacy_total - governed_total)   # clamp once
+      per_session    = (saved_total / total_turns) * avg_llm_turns_per_session
+      monthly        = per_session * monthly_sessions
+      annual_usd     = monthly * 12 * input_price_per_1m_tokens_usd / 1_000_000
+    """
     tier_counts = {tier: 0 for tier in _TIERS}
     blocked = 0
     for turn in turns:
@@ -295,34 +342,78 @@ def _section_token_savings(
         if summary.get("would_block") or summary.get("outcome") == PublicOutcome.BLOCK.value:
             blocked += 1
 
+    total = len(turns)
+
+    legacy_per_turn = _num(prospect_inputs.get("legacy_system_tokens_per_turn"))
+    governed_per_turn = _num(prospect_inputs.get("governed_system_tokens_per_turn"))
+    turns_per_session = _num(prospect_inputs.get("avg_llm_turns_per_session"))
+    monthly_sessions = _num(prospect_inputs.get("monthly_sessions"))
+    input_price = _num(prospect_inputs.get("input_price_per_1m_tokens_usd"))
+
+    # The core token model needs both the legacy and governed per-turn figures
+    # plus at least one observed turn. Otherwise we report nothing computed.
+    model_supplied = legacy_per_turn is not None and governed_per_turn is not None
+    can_estimate = model_supplied and total > 0
+
+    warning_append = None
+    regulated_floor = None
+    tokens_saved_per_session = None
+    monthly_tokens_saved = None
+    annual_usd_saved = None
+
+    if can_estimate:
+        warning_append = _num(prospect_inputs.get("warning_append_tokens")) or 0.0
+        floor_input = _num(prospect_inputs.get("regulated_floor_tokens"))
+        regulated_floor = floor_input if floor_input is not None else governed_per_turn
+
+        governed_total = (
+            tier_counts["tier_clean"] * governed_per_turn
+            + tier_counts["tier_warning"] * (governed_per_turn + warning_append)
+            + tier_counts["tier_escalation"] * regulated_floor
+        )
+        legacy_total = total * legacy_per_turn
+        saved_total = max(0.0, legacy_total - governed_total)
+        saved_per_turn = saved_total / total
+
+        if turns_per_session is not None:
+            tokens_saved_per_session = saved_per_turn * turns_per_session
+            if monthly_sessions is not None:
+                monthly_tokens_saved = tokens_saved_per_session * monthly_sessions
+                if input_price is not None:
+                    annual_usd_saved = monthly_tokens_saved * 12.0 * input_price / 1_000_000.0
+
+    basis = _TOKEN_BASIS_ESTIMATED if can_estimate else _TOKEN_BASIS_INSUFFICIENT
+
     return {
         "section": "token_savings_calculation",
+        "basis": basis,
+        "disclaimer": TOKEN_SAVINGS_DISCLAIMER,
         "upgrade_path": UPGRADE_MESSAGE,
         "prospect_inputs": {
-            "avg_tokens_per_session_legacy_system": prospect_inputs.get(
-                "avg_tokens_per_session_legacy_system"
+            "avg_tokens_per_session_legacy_system": _num(
+                prospect_inputs.get("avg_tokens_per_session_legacy_system")
             ),
-            "avg_llm_turns_per_session": prospect_inputs.get("avg_llm_turns_per_session"),
-            "monthly_sessions": prospect_inputs.get("monthly_sessions"),
-            "input_price_per_1m_tokens_usd": prospect_inputs.get("input_price_per_1m_tokens_usd"),
+            "avg_llm_turns_per_session": turns_per_session,
+            "monthly_sessions": monthly_sessions,
+            "input_price_per_1m_tokens_usd": input_price,
         },
         "measured_from_shadow": {
-            "total_turns": len(turns),
+            "total_turns": total,
             "tier_clean_turns": tier_counts["tier_clean"],
             "tier_warning_turns": tier_counts["tier_warning"],
             "tier_escalation_turns": tier_counts["tier_escalation"],
             "blocked_llm_turns": blocked,
         },
         "token_model": {
-            "legacy_system_tokens_per_turn": None,
-            "governed_system_tokens_per_turn": None,
-            "warning_append_tokens": None,
-            "regulated_floor_tokens": None,
+            "legacy_system_tokens_per_turn": legacy_per_turn if can_estimate else None,
+            "governed_system_tokens_per_turn": governed_per_turn if can_estimate else None,
+            "warning_append_tokens": warning_append,
+            "regulated_floor_tokens": regulated_floor,
         },
         "savings": {
-            "tokens_saved_per_session_estimate": None,
-            "monthly_tokens_saved_estimate": None,
-            "annual_usd_saved_estimate": None,
+            "tokens_saved_per_session_estimate": tokens_saved_per_session,
+            "monthly_tokens_saved_estimate": monthly_tokens_saved,
+            "annual_usd_saved_estimate": annual_usd_saved,
         },
     }
 
@@ -613,8 +704,25 @@ def aggregate_shadow_report(
     }
 
 
+def _load_config(path: str | None) -> dict[str, Any]:
+    """Load an optional runtime config (pricing/token-model/period) JSON.
+
+    Recognized keys: ``prospect_inputs`` (dict, includes the token model and
+    pricing fields used by the token-savings section), ``latency_targets``
+    (dict), ``period_start_utc`` and ``period_end_utc`` (strings). Unknown keys
+    are ignored. Everything is integrator-supplied; there are no defaults.
+    """
+    if not path:
+        return {}
+    with open(path, "r", encoding="utf-8") as handle:
+        data = json.load(handle)
+    if not isinstance(data, dict):
+        raise ValueError("Config file must contain a JSON object at the top level.")
+    return data
+
+
 def main(argv: list[str] | None = None) -> int:
-    """CLI: saski-shadow aggregate --input PATH --output PATH [--schema v1]."""
+    """CLI: saski-shadow aggregate --input PATH --output PATH [--config PATH]."""
     parser = argparse.ArgumentParser(prog="saski-shadow")
     subparsers = parser.add_subparsers(dest="command")
     aggregate_parser = subparsers.add_parser(
@@ -623,14 +731,30 @@ def main(argv: list[str] | None = None) -> int:
     aggregate_parser.add_argument("--input", required=True, help="Path to JSONL turn store.")
     aggregate_parser.add_argument("--output", required=True, help="Path to write report JSON.")
     aggregate_parser.add_argument("--schema", default="v1", help="Report schema version.")
+    aggregate_parser.add_argument(
+        "--config",
+        default=None,
+        help=(
+            "Optional JSON config with integrator inputs: prospect_inputs "
+            "(token model + pricing for the token-savings estimate), "
+            "latency_targets, period_start_utc, period_end_utc."
+        ),
+    )
 
     args = parser.parse_args(argv)
     if args.command != "aggregate":
         parser.print_help()
         return 2
 
+    config = _load_config(args.config)
     turns = load_turns_jsonl(args.input)
-    report = aggregate_shadow_report(turns)
+    report = aggregate_shadow_report(
+        turns,
+        period_start_utc=config.get("period_start_utc"),
+        period_end_utc=config.get("period_end_utc"),
+        prospect_inputs=config.get("prospect_inputs"),
+        latency_targets=config.get("latency_targets"),
+    )
     with open(args.output, "w", encoding="utf-8") as handle:
         json.dump(report, handle, indent=2, sort_keys=True)
         handle.write("\n")

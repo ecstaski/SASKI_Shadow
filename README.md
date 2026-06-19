@@ -36,7 +36,7 @@ Report sections and what they honestly promise:
 | Section | What the baseline delivers |
 |---------|---------------------------|
 | PII and PHI Detection | Counts and redacts obvious US identifier patterns — SSN, phone, email, credit card, date of birth, insurance ID, address, IP. Not HIPAA Safe Harbor complete. |
-| Compliance Exposure | Flags turns that match your own policy rules. No built-in statute enforcement. A built-in US AI law database is coming soon. |
+| Compliance Exposure | Flags turns that match your own policy rules, and names public US AI laws by jurisdiction and domain from a transparent starter set (see Law Coverage). No built-in statute *enforcement*. |
 | Token Savings | Arithmetic estimate from your actual tier counts and integrator-supplied pricing inputs. |
 | Cryptographic Evidence | Full structural accuracy — deterministic hashes, artifact chain, schema-valid envelope. This is the strongest section. |
 | Escalation Signals | Counts conservative public distress phrase matches. Not clinical crisis detection. |
@@ -81,6 +81,14 @@ package installs nothing beyond the Python
 standard library. Optional extras exist only 
 for development and the licensed engine adapter.
 
+To use the optional licensed-engine adapter 
+(`saski_shadow.integrations.saski_sdk`), install 
+the extra:
+
+```bash
+pip install "saski-shadow[saski-sdk]"
+```
+
 ---
 
 ## What it does
@@ -102,13 +110,94 @@ for development and the licensed engine adapter.
 
 - Does not perform clinical safety enforcement 
   or crisis detection.
-- Does not ship a statute or jurisdiction law 
-  database — compliance is evaluated against 
-  your own policy rules only.
+- Does not ship the full statute enforcement 
+  database or any proprietary compliance logic — 
+  it matches a transparent starter set of public 
+  law facts for exposure awareness only (see 
+  Law Coverage below).
 - Does not reproduce any proprietary scoring, 
   thresholds, or detection methodology.
 - Does not make network calls, download models, 
   or gate on a license.
+
+---
+
+## Law Coverage
+
+Shadow mode ships a small, transparent starter 
+set of **public US AI law facts** (identifiers, 
+jurisdictions, domains, citations, effective 
+dates, and plain-language notes). It matches 
+those facts to a turn purely by integrator-supplied 
+jurisdiction and domain. It does **not** ship the 
+enforcement mappings, thresholds, or routing logic 
+that the licensed SASKI engine uses.
+
+The exact figures below are derived from the 
+starter set itself (`saski_shadow.laws.coverage_summary`) 
+and are verified by a test, so they stay accurate 
+as the set grows.
+
+**Geographic scope:** shadow mode currently covers 
+US state and federal AI laws only — it does not yet 
+include EU, UK, or other non-US jurisdictions. If EU 
+coverage is added in the future, it will go through 
+the same inventory-and-verification process used for 
+the US laws here, not be added piecemeal.
+
+### What's included
+
+**60 laws across 35 U.S. state-level jurisdictions**, 
+grouped by the per-message signal they relate to:
+
+| Coverage area | Domain | Count |
+| --- | --- | --- |
+| Conversational AI & companion-chatbot disclosure and safety | `consumer_chatbot` | 14 laws / 13 states |
+| AI-generated CSAM | `csam` | 31 laws / 26 states |
+| AI employment & hiring discrimination | `employment` | 5 laws / 4 states |
+| AI claiming clinical credentials (mental/behavioral health) | `mental_health` | 6 laws / 5 states |
+| AI claiming credentials or communicating directly with patients | `healthcare` | 4 laws / 3 states |
+
+The healthcare-related entries are a deliberately 
+**focused subset**: laws about AI claiming a license 
+or credential it doesn't hold, or communicating 
+directly with patients as if it were a provider — 
+the things a text-only conversational layer can 
+actually observe per message.
+
+### What's explicitly NOT included, and why
+
+- **Generic consumer-privacy "automated 
+  decision-making" opt-out laws.** These apply to 
+  any business processing personal data for 
+  automated decisions, not specifically to 
+  conversational AI, and there is no per-message 
+  signal that distinguishes a chatbot from any 
+  other data-processing company.
+- **AI healthcare laws governing insurance claims 
+  and utilization-review decision systems.** Those 
+  regulate a different class of AI system than 
+  conversational text and are out of scope for 
+  this product.
+- **Requirements that are organizational policy 
+  rather than per-message checks** (e.g., audit, 
+  governance, or record-retention mandates). There 
+  is nothing to detect in a single turn.
+- **Anything requiring image, audio, or video 
+  watermark detection or embedding.** This is a 
+  text-only safety middleware.
+- **Any law not yet reviewed.** This is a growing 
+  starter set, not a claim of exhaustive coverage.
+
+### The core message
+
+Shadow mode is a free, open-source, zero-dependency 
+baseline detector for **compliance exposure 
+awareness**. It is **not** a substitute for legal 
+review, and using it does not mean an integrator's 
+AI is safe from violating laws not listed here. The 
+licensed SASKI engine provides broader, continuously 
+maintained, clinical-grade enforcement.
 
 ---
 
@@ -186,6 +275,70 @@ saski-shadow aggregate \
   --output shadow_report.json \
   --schema v1
 ```
+
+To populate the token-savings section, pass a 
+JSON config with your own pricing and token-model 
+inputs:
+
+```bash
+saski-shadow aggregate \
+  --input turns.jsonl \
+  --output shadow_report.json \
+  --config pricing.json
+```
+
+---
+
+## Token savings (how the estimate works)
+
+The token-savings section is an **estimate**, not a 
+measurement. It contains **no proprietary SASKI 
+constants** — every number is computed by visible 
+arithmetic from inputs *you* supply, applied to the 
+turn counts observed in your own pilot. Each output 
+field stays `null` until the inputs it depends on 
+are provided, and the section always reports its 
+`basis` (`estimated_from_integrator_inputs` or 
+`insufficient_inputs`).
+
+Supply inputs under `prospect_inputs` in the 
+`--config` JSON (or via the `prospect_inputs` 
+argument to `aggregate_shadow_report`):
+
+```json
+{
+  "prospect_inputs": {
+    "legacy_system_tokens_per_turn": 400,
+    "governed_system_tokens_per_turn": 120,
+    "warning_append_tokens": 30,
+    "regulated_floor_tokens": 200,
+    "avg_llm_turns_per_session": 8,
+    "monthly_sessions": 100000,
+    "input_price_per_1m_tokens_usd": 2.5
+  }
+}
+```
+
+The arithmetic, per LLM turn, is:
+
+```text
+governed_total = clean*G + warning*(G + W) + escalation*R
+legacy_total   = total_turns * L
+saved_total    = max(0, legacy_total - governed_total)
+per_session    = (saved_total / total_turns) * avg_llm_turns_per_session
+monthly        = per_session * monthly_sessions
+annual_usd     = monthly * 12 * input_price_per_1m_tokens_usd / 1_000_000
+```
+
+where `L`/`G`/`W`/`R` are your 
+`legacy_system_tokens_per_turn`, 
+`governed_system_tokens_per_turn`, 
+`warning_append_tokens` (defaults to 0), and 
+`regulated_floor_tokens` (defaults to `G`). If you 
+omit `legacy_system_tokens_per_turn` or 
+`governed_system_tokens_per_turn`, the section 
+returns all-`null` savings with 
+`basis = "insufficient_inputs"`.
 
 ---
 

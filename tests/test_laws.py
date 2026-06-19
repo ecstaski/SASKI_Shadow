@@ -1,13 +1,46 @@
 """Tests for the starter law set and the jurisdiction/domain matcher."""
 
-from saski_shadow.laws import STARTER_LAWS, match_laws
+import pathlib
+
+from saski_shadow.laws import STARTER_LAWS, coverage_summary, match_laws
+
+README = pathlib.Path(__file__).resolve().parents[1] / "README.md"
+
+
+def test_readme_law_coverage_counts_match_starter_set():
+    """Guard: the README's Law Coverage figures must match the live data.
+
+    If the starter set grows but the README is not updated, this fails.
+    """
+    text = README.read_text(encoding="utf-8")
+    cov = coverage_summary()
+
+    total = f"{cov['total_laws']} laws across {cov['total_states']}"
+    assert total in text, f"README missing total-coverage figure: {total!r}"
+
+    for domain, stats in cov["by_domain"].items():
+        token = f"{stats['laws']} laws / {stats['states']} states"
+        assert token in text, f"README missing {domain} figure: {token!r}"
 
 
 def test_starter_set_has_expected_count_and_fact_only_fields():
-    assert len(STARTER_LAWS) == 14
-    required = {"law_id", "jurisdiction", "domain", "citation", "effective_date", "note"}
+    assert len(STARTER_LAWS) == 60
+    required = {
+        "law_id",
+        "jurisdiction",
+        "domain",
+        "citation",
+        "effective_date",
+        "date_added",
+        "note",
+    }
     for law in STARTER_LAWS:
         assert set(law) == required
+
+
+def test_law_ids_are_unique():
+    ids = [law["law_id"] for law in STARTER_LAWS]
+    assert len(ids) == len(set(ids))
 
 
 def test_exact_state_domain_match_names_specific_law():
@@ -17,8 +50,8 @@ def test_exact_state_domain_match_names_specific_law():
 
 
 def test_domain_must_match_exactly():
-    # CA has chatbot and healthcare laws, but no employment law in the set.
-    assert match_laws("US-CA", "employment") == []
+    # CA has chatbot, healthcare, and employment laws, but no mental_health law.
+    assert match_laws("US-CA", "mental_health") == []
 
 
 def test_nyc_turn_matches_both_city_and_state_laws():
