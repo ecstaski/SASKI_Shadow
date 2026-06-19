@@ -6,6 +6,11 @@ enforcement logic, no thresholds, no signal-to-statute trigger maps. Whether a
 law applies to a turn is decided solely by the integrator-supplied jurisdiction
 and domain.
 
+This file is a manually synced internal copy of ``laws.json`` from the
+``saski-law-registry`` repo (https://github.com/ecstaski/saski-law-registry).
+It is NOT a live runtime dependency — no network calls are made. When the
+registry updates, this file must be resynced as a deliberate manual step.
+
 ``date_added`` records when an entry was added to this set so reviewers can
 tell at a glance which laws have not been rechecked in a while. New entries in
 future batches should carry their own actual date rather than reusing an older

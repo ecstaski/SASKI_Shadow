@@ -55,7 +55,7 @@ README.md
 
 ## Law Data Sync
 
-`laws/starter.py` is a manually synced internal copy of `saski-law-registry`'s `laws.json` (the public source of truth as of June 2026). It is NOT a live runtime dependency — no network calls. When the registry updates, this file needs a manual or build-step resync; it does not happen automatically.
+`laws/starter.py` is a manually synced internal copy of `saski-law-registry`'s `laws.json` (https://github.com/ecstaski/saski-law-registry) — the public source of truth as of June 2026. It is NOT a live runtime dependency — no network calls. When the registry updates, this file needs a manual or build-step resync; it does not happen automatically.
 
 ---
 
@@ -68,9 +68,8 @@ Run the full test suite and confirm lint is clean before any commit. (Confirm ex
 ## Git Identity & Push Configuration
 
 - `user.name`: `ecstaski`
-- `user.email`: `vwxtski@gmail.com` (confirmed by Stephen on 2026-06-18). Set explicitly at the **repo-local** level (`git config --local`), overriding the inherited global value (`ecstaski@mytrusted.ai`), which remains untouched and still applies to other repositories.
-- Push auth: HTTPS via the macOS `osxkeychain` credential helper (system default, not custom-configured). No SSH key used for push.
-- Note: the repo-local identity affects future commits only; commits made before this was set retain their original author email unless history is deliberately rewritten (do not do this without an explicit, separate request).
+- `user.email`: `vwxtski@gmail.com` — set as a repo-local override (`git config --local`), confirmed working as of commit `68443fb`.
+- Push auth: HTTPS via the macOS `osxkeychain` credential helper.
 
 ---
 
