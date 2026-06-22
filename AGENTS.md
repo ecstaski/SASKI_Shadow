@@ -59,6 +59,66 @@ README.md
 
 ---
 
+## 🔗 sasi-sdk Relationship & Alignment
+
+The SASKI SDK (private) is the enforcement source of truth
+for saski-shadow. This repo consumes the SDK's public
+surface and must stay aligned with it. Any Cursor session
+in this repo must be aware of this relationship before
+making changes to laws, tests, or report schema
+documentation.
+
+### What this repo depends on
+
+- `laws.json` in saski-law-registry — source of truth for
+  all law entries. `saski_shadow/laws/starter.py` is a
+  7-field manually synced subset. Sync process is
+  documented in `SYNC.md` in this repo. Never edit
+  starter.py entries directly — always resync from the
+  registry.
+- SDK enforcement machinery — the internal enforcement
+  engine in sasi-sdk drives what shadow mode can observe
+  and report. Shadow mode can only surface compliance
+  signals for laws that the SDK has corresponding
+  enforcement paths for. The mapping between registry
+  entries and SDK enforcement paths is maintained in
+  the private sasi-sdk repo.
+- Intent tag vocabulary — tags referenced in shadow
+  documentation must match the canonical runtime tag
+  list maintained in sasi-sdk. Do not add or reference
+  tags in public documentation that do not exist in the
+  SDK's runtime allowlist.
+
+### Coverage alignment
+
+A full internal alignment investigation was completed in
+June 2026 mapping all 68 registry entries against SDK
+enforcement machinery. Results and gap analysis are
+documented in the private sasi-sdk repo (AGENTS.md,
+section: saski-shadow Relationship & Alignment). Shadow
+Cursor sessions should request that document from Stephen
+when SDK alignment decisions need to be made.
+
+### Rules for this repo when SDK alignment is in scope
+
+- Before adding a test that asserts a specific compliance
+  signal fires for a given law: verify with Stephen that
+  the SDK has an enforcement path for that law. Testing
+  for signals the SDK cannot produce will produce false
+  test failures.
+- When SASKI Cursor completes jurisdiction wiring work
+  for additional states or federal entries, Shadow Cursor
+  will need a follow-up prompt to update test assertions
+  and coverage counts. Stephen will coordinate the
+  sequencing.
+- SYNC.md documents the registry resync process. Follow
+  it exactly when laws.json is updated.
+- Never reference internal SDK module names, class names,
+  tag names, enforcement thresholds, or implementation
+  details in any file in this repo.
+
+---
+
 ## Testing Requirements
 
 Run the full test suite and confirm lint is clean before any commit. (Confirm exact lint command/tool if unclear — don't assume.)
@@ -116,4 +176,4 @@ Types: `FEAT:` `FIX:` `DOCS:` `TEST:` `CHORE:`
 
 ---
 
-*Last updated: June 2026*
+*Last updated: 2026-06-22*
