@@ -147,16 +147,20 @@ the US laws here, not be added piecemeal.
 
 ### What's included
 
-**60 laws across 35 U.S. state-level jurisdictions**, 
+**68 laws across 36 U.S. state-level and federal jurisdictions**, 
 grouped by the per-message signal they relate to:
 
 | Coverage area | Domain | Count |
 | --- | --- | --- |
-| Conversational AI & companion-chatbot disclosure and safety | `consumer_chatbot` | 14 laws / 13 states |
-| AI-generated CSAM | `csam` | 31 laws / 26 states |
-| AI employment & hiring discrimination | `employment` | 5 laws / 4 states |
+| Conversational AI & companion-chatbot disclosure and safety | `consumer_chatbot` | 16 laws / 14 states |
+| AI-generated CSAM | `csam` | 34 laws / 27 states |
+| AI employment & hiring discrimination | `employment` | 7 laws / 5 states |
 | AI claiming clinical credentials (mental/behavioral health) | `mental_health` | 6 laws / 5 states |
-| AI claiming credentials or communicating directly with patients | `healthcare` | 4 laws / 3 states |
+| AI claiming credentials or communicating directly with patients | `healthcare` | 5 laws / 4 states |
+
+The set includes **8 federal (`US`) laws** that apply across every US 
+jurisdiction in their domain. In the figures above, federal `US` is 
+counted as a single jurisdiction alongside the state-level ones.
 
 The healthcare-related entries are a deliberately 
 **focused subset**: laws about AI claiming a license 

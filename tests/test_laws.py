@@ -24,7 +24,7 @@ def test_readme_law_coverage_counts_match_starter_set():
 
 
 def test_starter_set_has_expected_count_and_fact_only_fields():
-    assert len(STARTER_LAWS) == 60
+    assert len(STARTER_LAWS) == 68
     required = {
         "law_id",
         "jurisdiction",
@@ -44,9 +44,11 @@ def test_law_ids_are_unique():
 
 
 def test_exact_state_domain_match_names_specific_law():
+    # A CA healthcare turn matches the two CA-specific laws plus any federal
+    # ("US") healthcare law, since "US" is a broader prefix of "US-CA".
     matched = match_laws("US-CA", "healthcare")
     ids = {law["law_id"] for law in matched}
-    assert ids == {"US-CA-AB3030-HEALTH", "US-CA-HEALTH-ADVICE-AI"}
+    assert ids == {"US-CA-AB3030-HEALTH", "US-CA-HEALTH-ADVICE-AI", "US-HIPAA"}
 
 
 def test_domain_must_match_exactly():
@@ -74,7 +76,17 @@ def test_missing_jurisdiction_or_domain_returns_empty():
 
 
 def test_unknown_jurisdiction_returns_empty():
-    assert match_laws("US-ZZ", "consumer_chatbot") == []
+    # A non-US jurisdiction matches nothing — the starter set is US-only, and
+    # no law's jurisdiction is a prefix of "GB".
+    assert match_laws("GB", "consumer_chatbot") == []
+
+
+def test_federal_law_matches_any_us_subjurisdiction():
+    # Federal ("US") laws apply to every US-prefixed turn in their domain,
+    # including a US sub-jurisdiction with no state-specific law of its own.
+    ids = {law["law_id"] for law in match_laws("US-ZZ", "consumer_chatbot")}
+    assert "US-FTC-ACT-5" in ids
+    assert "US-COPPA" in ids
 
 
 def test_match_returns_independent_copies():

@@ -218,7 +218,9 @@ def test_section2_says_so_plainly_when_no_metadata_supplied():
 
 
 def test_section2_no_match_when_metadata_present_but_nothing_matches():
-    turns = [_turn(0, "sess_test_001", jurisdiction="US-ZZ", domain="consumer_chatbot")]
+    # Non-US jurisdiction: metadata is present but nothing in the US-only
+    # starter set matches (federal "US" laws do not apply outside the US).
+    turns = [_turn(0, "sess_test_001", jurisdiction="GB", domain="consumer_chatbot")]
     section = aggregate_shadow_report(turns)["sections"]["compliance_exposure_examples"]
     assert section["matched_laws"] == []
     assert section["law_match_summary"]["turns_with_jurisdiction_metadata"] == 1
