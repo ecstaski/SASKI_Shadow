@@ -24,7 +24,7 @@ def test_readme_law_coverage_counts_match_starter_set():
 
 
 def test_starter_set_has_expected_count_and_fact_only_fields():
-    assert len(STARTER_LAWS) == 68
+    assert len(STARTER_LAWS) == 73
     required = {
         "law_id",
         "jurisdiction",
@@ -44,11 +44,18 @@ def test_law_ids_are_unique():
 
 
 def test_exact_state_domain_match_names_specific_law():
-    # A CA healthcare turn matches the two CA-specific laws plus any federal
+    # A CA healthcare turn matches the two CA-specific laws plus every federal
     # ("US") healthcare law, since "US" is a broader prefix of "US-CA".
     matched = match_laws("US-CA", "healthcare")
     ids = {law["law_id"] for law in matched}
-    assert ids == {"US-CA-AB3030-HEALTH", "US-CA-HEALTH-ADVICE-AI", "US-HIPAA"}
+    assert ids == {
+        "US-CA-AB3030-HEALTH",
+        "US-CA-HEALTH-ADVICE-AI",
+        "US-HIPAA",
+        "US-FTC-HBNR",
+        "US-42-CFR-PART-2",
+        "US-ACA-1557",
+    }
 
 
 def test_domain_must_match_exactly():
