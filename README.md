@@ -119,6 +119,12 @@ pip install "saski-shadow[saski-sdk]"
   thresholds, or detection methodology.
 - Does not make network calls, download models, 
   or gate on a license.
+- Does not itself detect CSAM. CSAM-related 
+  compliance signals surface only when an 
+  upstream classifier emits the relevant tag for 
+  a turn. Without that upstream tag integration, 
+  shadow mode will not surface any CSAM 
+  compliance signals.
 
 ---
 
@@ -161,6 +167,13 @@ grouped by the per-message signal they relate to:
 The set includes **13 federal (`US`) laws** that apply across every US 
 jurisdiction in their domain. In the figures above, federal `US` is 
 counted as a single jurisdiction alongside the state-level ones.
+
+Matching is by jurisdiction prefix: a federal `US` entry matches any 
+US-prefixed turn (`US-CA`, `US-NY-NYC`, and so on) in the relevant 
+domain. So a `US-CA` healthcare turn surfaces both the California 
+state healthcare laws and the federal healthcare laws (HIPAA, 
+ACA § 1557, and others), while a state-scoped entry like `US-CA` 
+matches only `US-CA` turns and narrower.
 
 The healthcare-related entries are a deliberately 
 **focused subset**: laws about AI claiming a license 
