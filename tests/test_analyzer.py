@@ -76,3 +76,16 @@ def test_output_review_runs_when_assistant_output_supplied():
     review = result.metadata["output_review"]
     assert review["human_escalation_claimed"] is True
     assert result.envelope["output_hash"] is not None
+
+
+def test_analyze_turn_passes_jurisdiction_and_domain_to_engine_summary():
+    result = analyze_turn(
+        "Hello, can you help me?",
+        session_context={
+            "user_jurisdiction": "US-CA",
+            "domain": "healthcare",
+        },
+    )
+    summary = result.metadata["engine_summary"]
+    assert summary["user_jurisdiction"] == "US-CA"
+    assert summary["domain"] == "healthcare"
