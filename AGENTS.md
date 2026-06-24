@@ -152,6 +152,7 @@ Types: `FEAT:` `FIX:` `DOCS:` `TEST:` `CHORE:`
 - Every implementation prompt ends by asking whether you agree with the plan or have questions — never execute blind.
 - If a prompt references an external AI opinion or design decision not pasted into the conversation, ask for it before proceeding.
 - Research-only prompts don't require backups; implementation prompts do.
+- When surfacing questions or decision points during a task, always ask them inline in your response as numbered questions with lettered multiple-choice options. Do not use interactive UI elements or clickable answer boxes. Always include your recommendation for each option.
 
 ---
 
