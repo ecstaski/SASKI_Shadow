@@ -211,6 +211,26 @@ def test_section2_names_specific_laws_on_jurisdiction_domain_match():
     }
 
 
+def test_section2_surfaces_tier2_federal_laws_via_prefix_match():
+    # Federal ("US") entries must reach a generated report for any US-prefixed
+    # turn in the relevant domain, alongside the state-specific matches.
+    turns = [
+        _turn(0, "sess_test_001", jurisdiction="US-CA", domain="employment"),
+        _turn(1, "sess_test_002", jurisdiction="US-CA", domain="healthcare"),
+    ]
+    section = aggregate_shadow_report(turns)["sections"]["compliance_exposure_examples"]
+    unique = set(section["law_match_summary"]["unique_law_ids"])
+    # US-CA employment turn surfaces federal employment entries.
+    assert {"US-ADEA", "US-FCRA"}.issubset(unique)
+    # US-CA healthcare turn surfaces federal healthcare entries beside HIPAA.
+    assert {
+        "US-HIPAA",
+        "US-FTC-HBNR",
+        "US-42-CFR-PART-2",
+        "US-ACA-1557",
+    }.issubset(unique)
+
+
 def test_section2_says_so_plainly_when_no_metadata_supplied():
     section = aggregate_shadow_report(_sample_turns())["sections"]["compliance_exposure_examples"]
     assert section["matched_laws"] == []
