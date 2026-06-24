@@ -239,7 +239,23 @@ from saski_shadow import (
 from saski_shadow.analyzer import analyze_turn
 
 # 1. Run the local baseline analyzer.
-result = analyze_turn(user_message, policy=integrator_policy)
+result = analyze_turn(
+    user_message,
+    session_context={
+        "user_jurisdiction": "US-CA",
+        # replace with your user's jurisdiction
+        # e.g. "US-NY", "US-TX", "US"
+        "domain": "consumer_chatbot",
+        # one of: consumer_chatbot, csam,
+        # employment, mental_health, healthcare
+    },
+    policy=integrator_policy,
+)
+# Without user_jurisdiction and domain in
+# session_context, the analyzer records no
+# compliance context for the turn. Law matching
+# in the aggregated report then returns no
+# results for that turn.
 
 # 2. Build a hash-only turn payload.
 payload = turn_payload_from_result(
