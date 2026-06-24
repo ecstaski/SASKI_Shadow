@@ -119,3 +119,45 @@ def test_message_for_llm_carries_redacted_egress_payload():
 def test_message_for_llm_passthrough_for_clean_text():
     result = analyze_turn("the purple widget hums quietly")
     assert result.message_for_llm == "the purple widget hums quietly"
+
+
+def test_domains_list_is_carried_through_and_domain_mirrors_first():
+    result = analyze_turn(
+        "the purple widget hums quietly",
+        session_context={"domains": ["consumer_chatbot", "csam"]},
+    )
+    assert result.domains == ["consumer_chatbot", "csam"]
+    assert result.domain == "consumer_chatbot"
+    summary = result.metadata["engine_summary"]
+    assert summary["domains"] == ["consumer_chatbot", "csam"]
+    assert summary["domain"] == "consumer_chatbot"
+
+
+def test_single_domain_string_is_normalized_to_one_element_list():
+    result = analyze_turn(
+        "the purple widget hums quietly",
+        session_context={"domain": "healthcare"},
+    )
+    assert result.domains == ["healthcare"]
+    assert result.domain == "healthcare"
+    summary = result.metadata["engine_summary"]
+    assert summary["domains"] == ["healthcare"]
+    assert summary["domain"] == "healthcare"
+
+
+def test_no_domain_yields_empty_list_and_none_without_raising():
+    result = analyze_turn("the purple widget hums quietly", session_context={})
+    assert result.domains == []
+    assert result.domain is None
+    summary = result.metadata["engine_summary"]
+    assert summary["domains"] == []
+    assert summary["domain"] is None
+
+
+def test_domains_precedence_over_domain_when_both_present():
+    result = analyze_turn(
+        "the purple widget hums quietly",
+        session_context={"domain": "healthcare", "domains": ["consumer_chatbot", "csam"]},
+    )
+    assert result.domains == ["consumer_chatbot", "csam"]
+    assert result.domain == "consumer_chatbot"

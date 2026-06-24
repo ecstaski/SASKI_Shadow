@@ -107,8 +107,11 @@ def result_to_jsonl_turn(
         "provider_id": provider_id if provider_id is not None else result.provider_id,
         # Convenience top-level mirrors of the jurisdiction/domain the aggregator
         # matches laws on. engine_summary carries the same values as a fallback.
+        # Both domain (first only) and domains (full list) are written so the
+        # report's _turn_domain() receives the complete multi-domain list.
         "jurisdiction": engine_summary.get("user_jurisdiction"),
         "domain": engine_summary.get("domain"),
+        "domains": list(engine_summary.get("domains") or []),
         "envelope": envelope,
         # The analyzer's full engine_summary (tier, escalation, timings, mode,
         # jurisdiction, domain) -- the block the slim evidence serializer drops.

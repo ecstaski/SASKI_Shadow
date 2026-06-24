@@ -1,0 +1,4 @@
+{
+  "_comment": "Copy to saski_shadow_config.json and customize. This file is committed; saski_shadow_config.json is gitignored.",
+  "output_dir": "outputs"
+}

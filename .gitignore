@@ -11,7 +11,10 @@ build/
 .DS_Store
 
 # Editor backups and packed-repo / audit dumps (keep internals out of the tree)
+# Match both plain ".bak" files and timestamped backups produced by the
+# AGENTS.md convention (e.g. report.py.bak.20260624_135223).
 *.bak
+*.bak.*
 *_audit.txt
 repomix-output*
 

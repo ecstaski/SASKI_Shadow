@@ -52,7 +52,8 @@
         "escalation_signal_count",
         "unsafe_flow_documentation",
         "latency_impact_report",
-        "recommended_path"
+        "recommended_path",
+        "sdk_integration_signals"
       ],
       "additionalProperties": false,
       "properties": {
@@ -63,7 +64,8 @@
         "escalation_signal_count": { "$ref": "#/$defs/escalation_signal_count" },
         "unsafe_flow_documentation": { "$ref": "#/$defs/unsafe_flow_documentation" },
         "latency_impact_report": { "$ref": "#/$defs/latency_impact_report" },
-        "recommended_path": { "$ref": "#/$defs/recommended_path" }
+        "recommended_path": { "$ref": "#/$defs/recommended_path" },
+        "sdk_integration_signals": { "$ref": "#/$defs/sdk_integration_signals" }
       }
     }
   },
@@ -221,7 +223,8 @@
                 "type": "object",
                 "additionalProperties": false,
                 "properties": {
-                  "pii_detected": { "type": "boolean" },
+                  "baseline_pii_signal": { "type": "boolean" },
+                  "pii_detection_method": { "type": "string" },
                   "pii_types": { "type": "array", "items": { "type": "string" } },
                   "escalation_detected": { "type": "boolean" },
                   "outcome": {
@@ -300,7 +303,8 @@
             "tier_clean_turns": { "type": "integer", "minimum": 0 },
             "tier_warning_turns": { "type": "integer", "minimum": 0 },
             "tier_escalation_turns": { "type": "integer", "minimum": 0 },
-            "blocked_llm_turns": { "type": "integer", "minimum": 0 }
+            "would_have_blocked_turns": { "type": "integer", "minimum": 0 },
+            "shadow_mode_note": { "type": "string" }
           }
         },
         "token_model": {
@@ -411,7 +415,7 @@
               "outcome": { "$ref": "#/$defs/public_outcome" },
               "risk_band": { "$ref": "#/$defs/risk_band" },
               "input_hash": { "$ref": "#/$defs/hash64" },
-              "llm_egress_suppressed": { "type": "boolean" },
+              "llm_egress_would_be_suppressed": { "type": "boolean" },
               "shadow_actual_llm_response_hash": { "$ref": "#/$defs/hash64" }
             }
           }
@@ -532,6 +536,34 @@
               "exceeded_threshold": { "type": ["string", "null"] }
             }
           }
+        }
+      }
+    },
+    "sdk_integration_signal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signal_id", "category", "severity", "title", "observation", "sdk_recommendation", "affected_turns", "contact"],
+      "properties": {
+        "signal_id": { "type": "string" },
+        "category": { "type": "string" },
+        "severity": { "type": "string", "enum": ["info", "warning", "action_required"] },
+        "title": { "type": "string" },
+        "observation": { "type": "string" },
+        "sdk_recommendation": { "type": "string" },
+        "affected_turns": { "type": "integer", "minimum": 0 },
+        "contact": { "type": "string" }
+      }
+    },
+    "sdk_integration_signals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["section", "summary", "signals"],
+      "properties": {
+        "section": { "type": "string", "const": "sdk_integration_signals" },
+        "summary": { "type": "string" },
+        "signals": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/sdk_integration_signal" }
         }
       }
     },

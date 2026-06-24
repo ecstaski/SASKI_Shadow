@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import unicodedata
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from time import perf_counter
 from typing import Any
@@ -86,6 +86,11 @@ class BaselineAnalysisResult:
     # send to the LLM. Carries no raw PII; it is the text the message_for_llm_hash
     # was computed over.
     message_for_llm: str | None = None
+    # Integrator-supplied compliance domain(s) for downstream law matching.
+    # domains is the full list; domain mirrors domains[0] for backward
+    # compatibility with single-domain consumers (None when no domain supplied).
+    domain: str | None = None
+    domains: list[str] = field(default_factory=list)
 
     def get_audit_record(self) -> dict[str, Any]:
         summary = (self.metadata or {}).get("engine_summary", {})
@@ -166,6 +171,26 @@ def _normalize_mode(mode: str | None) -> str | None:
     return None
 
 
+def _normalize_domains(session_context: dict[str, Any]) -> list[str]:
+    """Resolve a turn's compliance domain(s) into a list of domain strings.
+
+    Precedence: a non-empty ``domains`` list wins; otherwise a non-empty
+    ``domain`` string becomes a one-element list; otherwise ``[]``. This is pure
+    factual passthrough of integrator-supplied metadata for downstream law
+    matching — it interprets nothing and never raises. Invalid types (a non-list
+    ``domains`` or a non-string ``domain``) fall back to ``[]`` silently.
+    """
+    plural = session_context.get("domains")
+    if isinstance(plural, list):
+        cleaned = [d for d in plural if isinstance(d, str) and d]
+        if cleaned:
+            return cleaned
+    single = session_context.get("domain")
+    if isinstance(single, str) and single:
+        return [single]
+    return []
+
+
 def _jurisdiction_source(session_context: dict[str, Any]) -> str:
     supplied = session_context.get("jurisdiction_source")
     if isinstance(supplied, str) and supplied in _VALID_JURISDICTION_SOURCES:
@@ -187,7 +212,11 @@ def analyze_turn(
         message: The raw user message to analyze.
         session_context: Optional integrator-supplied context (enforcement_mode,
             user_jurisdiction, domain, assistant_output, etc.). Values are passed
-            through factually and are not interpreted as safety signals.
+            through factually and are not interpreted as safety signals. Compliance
+            domain may be supplied either as ``domain`` (a single string) or as
+            ``domains`` (a list of strings); ``domains`` takes precedence when both
+            are present. The result carries the full ``domains`` list plus a
+            ``domain`` mirror of the first element for backward compatibility.
         policy: Optional integrator policy dict evaluated against turn signals.
         mode: Optional public operating-mode tag (e.g. ``"child"``,
             ``"patient"``, ``"general_assistant"``). It is recorded on the result
@@ -316,7 +345,10 @@ def analyze_turn(
     # not analyzed or interpreted here; they exist so the aggregator can match
     # public laws by jurisdiction and domain downstream.
     user_jurisdiction = session_context.get("user_jurisdiction")
-    domain = session_context.get("domain")
+    # domains is the full integrator-supplied list; domain mirrors the first
+    # element for backward compatibility with single-domain consumers.
+    domains = _normalize_domains(session_context)
+    domain = domains[0] if domains else None
 
     engine_summary = {
         "outcome": outcome.value,
@@ -328,7 +360,8 @@ def analyze_turn(
         "governance_tier": tier,
         "phase_timings": timings,
         "user_jurisdiction": str(user_jurisdiction) if user_jurisdiction else None,
-        "domain": str(domain) if domain else None,
+        "domain": domain,  # backward compat — first domain only
+        "domains": domains,  # full list for multi-domain matching
         # mode is a reporting tag only; enforcement behavior lives in the licensed SDK.
         "mode": normalized_mode,
     }
@@ -357,4 +390,6 @@ def analyze_turn(
         metadata=metadata,
         mode=normalized_mode,
         message_for_llm=redacted_message,
+        domain=domain,
+        domains=domains,
     )

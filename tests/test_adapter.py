@@ -103,9 +103,9 @@ def test_full_pipeline_produces_non_empty_report(tmp_path):
 
     report = aggregate_shadow_report(loaded)
 
-    # Eight sections, correct structure.
+    # Nine sections (8 core + sdk_integration_signals), correct structure.
     assert report["schema_version"] == "shadow_report_v1"
-    assert len(report["sections"]) == 8
+    assert len(report["sections"]) == 9
 
     # Section 1 reflects real detection on the first turn.
     pii = report["sections"]["pii_phi_detection_summary"]
@@ -119,3 +119,32 @@ def test_full_pipeline_produces_non_empty_report(tmp_path):
     assert compliance["law_match_summary"]["turns_with_law_match"] == 2
     unique = set(compliance["law_match_summary"]["unique_law_ids"])
     assert {"US-CA-AB3030-HEALTH", "US-HIPAA"}.issubset(unique)
+
+
+def test_full_pipeline_multi_domain_surfaces_laws_from_each_domain(tmp_path):
+    # True end-to-end: a customer passes only session_context with a domains list.
+    # No manual turn-record construction; the list must flow analyze_turn ->
+    # result_to_jsonl_turn -> aggregate_shadow_report and surface laws from BOTH
+    # the consumer_chatbot and csam domains for a federal (US) jurisdiction.
+    result = analyze_turn(
+        "the purple widget hums quietly",
+        session_context={
+            "user_jurisdiction": "US",
+            "domains": ["consumer_chatbot", "csam"],
+        },
+    )
+    assert result.domains == ["consumer_chatbot", "csam"]
+
+    turn = result_to_jsonl_turn(result, session_id="sess_multi", turn_index=0)
+    assert turn["domains"] == ["consumer_chatbot", "csam"]
+
+    path = tmp_path / "turns.jsonl"
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write(json.dumps(turn) + "\n")
+
+    report = aggregate_shadow_report(load_turns_jsonl(str(path)))
+    compliance = report["sections"]["compliance_exposure_examples"]
+    unique = set(compliance["law_match_summary"]["unique_law_ids"])
+    # COPPA (consumer_chatbot) and a CSAM statute (csam) both surface.
+    assert "US-COPPA" in unique
+    assert "US-CSAM-CORE" in unique

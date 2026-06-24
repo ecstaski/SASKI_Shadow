@@ -44,6 +44,28 @@ from saski_shadow import (  # noqa: E402
 from saski_shadow.analyzer import analyze_turn  # noqa: E402
 
 
+def _resolve_outdir(
+    cli_outdir: str | None,
+    repo_root: pathlib.Path,
+) -> tuple[str, str]:
+    """Return (outdir_path, source_label).
+
+    Precedence: CLI --outdir flag > saski_shadow_config.json output_dir > default.
+    """
+    if cli_outdir is not None:
+        return cli_outdir, "cli_flag"
+    config_path = repo_root / "saski_shadow_config.json"
+    if config_path.exists():
+        try:
+            cfg = json.loads(config_path.read_text(encoding="utf-8"))
+            output_dir = cfg.get("output_dir")
+            if isinstance(output_dir, str) and output_dir:
+                return output_dir, "config_file"
+        except (json.JSONDecodeError, OSError):
+            pass
+    return str(repo_root / "outputs"), "default"
+
+
 def _load_session(path: str | None) -> list[dict]:
     if path:
         data = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
@@ -95,8 +117,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--outdir",
-        default=str(_REPO_ROOT / "outputs"),
-        help="Base output directory (default: ./outputs).",
+        default=None,
+        help=(
+            "Base output directory. Overrides saski_shadow_config.json output_dir. "
+            "Default: outputs/ (or config file value)."
+        ),
     )
     args = parser.parse_args(argv)
 
@@ -115,10 +140,13 @@ def main(argv: list[str] | None = None) -> int:
         if not os.environ.get(key):
             raise SystemExit(f"--provider {args.provider} requires {key} to be set")
 
+    outdir, outdir_source = _resolve_outdir(args.outdir, _REPO_ROOT)
+    print(f"Output directory: {outdir}  (source: {outdir_source})")
+
     session = _load_session(args.session)
 
     run_id = _dt.datetime.now(_dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    run_dir = pathlib.Path(args.outdir) / run_id
+    run_dir = pathlib.Path(outdir) / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     jsonl_path = run_dir / "turns.jsonl"
     log_path = run_dir / "session.log"
@@ -178,6 +206,21 @@ def main(argv: list[str] | None = None) -> int:
     turns = load_turns_jsonl(str(jsonl_path))
     report = aggregate_shadow_report(turns)
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+
+    sis = report["sections"]["sdk_integration_signals"]
+    log_lines.append("=== SDK INTEGRATION SIGNALS ===")
+    if sis["signals"]:
+        for sig in sis["signals"]:
+            sev_label = f"[{sig['severity']}]"
+            log_lines.append(f"{sev_label:<18} {sig['signal_id']}: {sig['title']}")
+            log_lines.append(f"{'':18} Observation: {sig['observation']}")
+            log_lines.append(f"{'':18} Recommendation: {sig['sdk_recommendation']}")
+            log_lines.append("")
+        log_lines.append("Contact info@techviz.us for licensed SDK integration support.")
+    else:
+        log_lines.append("No integration signals detected for this session.")
+    log_lines.append("================================")
+
     log_path.write_text("\n".join(log_lines), encoding="utf-8")
 
     compliance = report["sections"]["compliance_exposure_examples"]

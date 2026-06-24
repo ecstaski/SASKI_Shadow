@@ -30,10 +30,13 @@ from ..laws import (
 COMPLIANCE_DISCLAIMER = (
     "This report reflects a starter set of laws and will expand as coverage "
     "grows. It does not apply private SASKI enforcement mappings, thresholds, "
-    "or internal policy logic."
+    "or internal policy logic. Law matches are keyed on integrator-supplied "
+    "jurisdiction and domain metadata. Shadow mode does not perform "
+    "content-based jurisdiction inference or statute verification."
 )
 UPGRADE_MESSAGE = (
-    "For comprehensive results, add the licensed SASKI engine to your VPC deployment."
+    "For comprehensive results, add the licensed SASKI engine to your VPC deployment. "
+    "Contact SASKI Institute at info@techviz.us or www.techviz.us."
 )
 ESCALATION_DISCLAIMER = (
     "Escalation counts reflect baseline distress phrase-list matches only and are "
@@ -44,7 +47,10 @@ TOKEN_SAVINGS_DISCLAIMER = (
     "inputs using transparent arithmetic (observed tier counts x integrator "
     "per-turn token figures x integrator unit price). It embeds no proprietary "
     "SASKI prompt-assembly constants or hidden savings assumptions. Every output "
-    "is null unless the inputs it depends on are supplied."
+    "is null unless the inputs it depends on are supplied. Token savings are "
+    "estimated from would_have_blocked signals observed in shadow mode. No LLM "
+    "egress was suppressed during this session. Actual savings depend on "
+    "production traffic patterns and licensed SDK configuration."
 )
 
 # Honest scope statements surfaced inside detection-bearing sections so a
@@ -327,7 +333,8 @@ def _section_compliance(turns: list[dict[str, Any]], prospect_inputs: dict[str, 
                     },
                     "matched_laws": matched,
                     "observed_signals": {
-                        "pii_detected": bool(summary.get("pii_detected")),
+                        "baseline_pii_signal": bool(summary.get("pii_detected")),
+                        "pii_detection_method": "baseline_regex_only",
                         "pii_types": list(summary.get("pii_types") or []),
                         "escalation_detected": bool(summary.get("escalation_detected")),
                         "outcome": summary.get("outcome") if summary.get("outcome") in _OUTCOME_KEYS else None,
@@ -489,7 +496,8 @@ def _section_token_savings(
             "tier_clean_turns": tier_counts["tier_clean"],
             "tier_warning_turns": tier_counts["tier_warning"],
             "tier_escalation_turns": tier_counts["tier_escalation"],
-            "blocked_llm_turns": blocked,
+            "would_have_blocked_turns": blocked,
+            "shadow_mode_note": "enforcement not applied; counts reflect would_block signals only",
         },
         "token_model": {
             "legacy_system_tokens_per_turn": legacy_per_turn if can_estimate else None,
@@ -549,7 +557,7 @@ def _section_escalation(turns: list[dict[str, Any]]) -> dict[str, Any]:
                         "outcome": outcome if outcome in by_outcome else None,
                         "risk_band": risk if risk in by_risk else None,
                         "input_hash": turn.get("input_hash"),
-                        "llm_egress_suppressed": bool(summary.get("would_block")),
+                        "llm_egress_would_be_suppressed": bool(summary.get("would_block")),
                         "shadow_actual_llm_response_hash": turn.get("output_hash")
                         or turn.get("response_hash"),
                     }
@@ -761,6 +769,216 @@ def _resolve_period(
     return {"start_utc": start, "end_utc": end}
 
 
+def _section_sdk_integration_signals(
+    turns: list[dict[str, Any]],
+    sections: dict[str, Any],
+) -> dict[str, Any]:
+    """Derive actionable integration signals from the already-built report sections.
+
+    Each signal fires only when its condition is met — no signal is emitted when
+    the condition is false. Signal text describes observable shadow behavior and
+    SDK configuration guidance only. No numeric thresholds, no SDK module names,
+    no enforcement decision logic.
+    """
+    signals: list[dict[str, Any]] = []
+
+    pii_section = sections["pii_phi_detection_summary"]
+    compliance_section = sections["compliance_exposure_examples"]
+    escalation_section = sections["escalation_signal_count"]
+
+    turns_with_pii: int = pii_section["totals"]["turns_with_pii"]
+    escalation_turns: int = escalation_section["totals"]["escalation_turns"]
+    total_turns: int = escalation_section["totals"]["turns_processed"]
+    future_effective: list = compliance_section["matched_laws_by_status"]["future_effective"]
+
+    # Distinct domains and multi-domain turn count derived from the turn store.
+    all_domains: set[str] = set()
+    multi_domain_turns = 0
+    for turn in turns:
+        td = turn.get("domains")
+        if isinstance(td, list) and len(td) > 1:
+            multi_domain_turns += 1
+            for d in td:
+                if isinstance(d, str) and d:
+                    all_domains.add(d)
+        else:
+            val = turn.get("domain") or _engine_summary(turn).get("domain")
+            if isinstance(val, list):
+                for d in val:
+                    if isinstance(d, str) and d:
+                        all_domains.add(d)
+            elif isinstance(val, str) and val:
+                all_domains.add(val)
+
+    by_outcome = escalation_section.get("by_outcome", {})
+    crisis_turns = by_outcome.get("crisis_referral", 0) + by_outcome.get(
+        "physical_emergency_referral", 0
+    )
+
+    # SIS-001 — Distress without licensed detection
+    if escalation_turns > 0 and "detection_limitations" in escalation_section:
+        signals.append(
+            {
+                "signal_id": "SIS-001",
+                "category": "distress_detection",
+                "severity": "action_required",
+                "title": "Real distress detection requires licensed engine",
+                "observation": (
+                    f"Shadow detected {escalation_turns} escalation signal"
+                    f"{'s' if escalation_turns != 1 else ''} using integrator-supplied "
+                    "indicators. Baseline detection cannot identify real distress language "
+                    "without integrator-supplied phrases."
+                ),
+                "sdk_recommendation": (
+                    "Configure the licensed SASKI SDK with mode-appropriate crisis "
+                    "thresholds. The SDK's built-in distress detection operates without "
+                    "requiring integrator-supplied indicator lists."
+                ),
+                "affected_turns": escalation_turns,
+                "contact": "info@techviz.us",
+            }
+        )
+
+    # SIS-002 — Future-effective laws in active jurisdictions
+    if future_effective:
+        n_future = len(future_effective)
+        signals.append(
+            {
+                "signal_id": "SIS-002",
+                "category": "compliance_readiness",
+                "severity": "warning",
+                "title": "Upcoming compliance obligations detected",
+                "observation": (
+                    f"{n_future} future-effective law"
+                    f"{'s' if n_future != 1 else ''} matched for this session's "
+                    "jurisdictions. These are not yet enforceable but will become active "
+                    "on their effective dates."
+                ),
+                "sdk_recommendation": (
+                    "Review the future_effective law list and verify your SDK jurisdiction "
+                    "configuration will be updated before each law's effective date. "
+                    "Contact info@techviz.us for registry update notifications."
+                ),
+                "affected_turns": compliance_section["law_match_summary"][
+                    "turns_with_law_match"
+                ],
+                "contact": "info@techviz.us",
+            }
+        )
+
+    # SIS-003 — Multi-domain turns with single-domain session context
+    if multi_domain_turns > 0:
+        signals.append(
+            {
+                "signal_id": "SIS-003",
+                "category": "domain_configuration",
+                "severity": "info",
+                "title": "Multi-domain coverage active",
+                "observation": (
+                    f"{multi_domain_turns} turn"
+                    f"{'s' if multi_domain_turns != 1 else ''} used multi-domain matching. "
+                    "This requires explicit domain list configuration per turn."
+                ),
+                "sdk_recommendation": (
+                    "Verify your integration passes the correct domain context per turn. "
+                    "The licensed SDK enforces domain-specific obligations independently — "
+                    "misconfigured domain metadata may result in missed obligations."
+                ),
+                "affected_turns": multi_domain_turns,
+                "contact": "info@techviz.us",
+            }
+        )
+
+    # SIS-004 — PII detected without licensed redaction
+    if turns_with_pii > 0:
+        pii_types = pii_section["history_redaction"]["aggregate_pii_types_found"]
+        pii_types_str = ", ".join(pii_types) if pii_types else "unknown"
+        signals.append(
+            {
+                "signal_id": "SIS-004",
+                "category": "pii_redaction",
+                "severity": "action_required",
+                "title": "PII detected — licensed redaction recommended",
+                "observation": (
+                    f"Shadow detected PII in {turns_with_pii} turn"
+                    f"{'s' if turns_with_pii != 1 else ''} ({pii_types_str} types). "
+                    "Baseline detection uses regex patterns only. The licensed SDK "
+                    "provides HIPAA Safe Harbor redaction with jurisdiction-aware overrides."
+                ),
+                "sdk_recommendation": (
+                    "Enable the licensed SASKI SDK for production PII handling. Configure "
+                    "mode and jurisdiction to activate the appropriate redaction tier for "
+                    "your deployment."
+                ),
+                "affected_turns": turns_with_pii,
+                "contact": "info@techviz.us",
+            }
+        )
+
+    # SIS-005 — Cross-domain isolation not verified
+    if len(all_domains) > 1:
+        signals.append(
+            {
+                "signal_id": "SIS-005",
+                "category": "cross_domain_isolation",
+                "severity": "info",
+                "title": "Cross-domain isolation not explicitly tested",
+                "observation": (
+                    f"This session included {len(all_domains)} domains. Cross-domain law "
+                    "isolation (ensuring healthcare laws do not surface in employment turns, "
+                    "etc.) was not explicitly verified in this run."
+                ),
+                "sdk_recommendation": (
+                    "Run the shadow compliance harness with cross-domain negative tests "
+                    "before production deployment. Contact info@techviz.us for integration "
+                    "validation support."
+                ),
+                "affected_turns": total_turns,
+                "contact": "info@techviz.us",
+            }
+        )
+
+    # SIS-006 — No crisis floor verified
+    if crisis_turns == 0 and total_turns > 5:
+        signals.append(
+            {
+                "signal_id": "SIS-006",
+                "category": "crisis_detection_coverage",
+                "severity": "warning",
+                "title": "Crisis detection floor not exercised in this session",
+                "observation": (
+                    "No crisis-level signals were detected in this session. Shadow mode "
+                    "cannot verify crisis detection coverage — is_crisis is always False "
+                    "in the baseline package."
+                ),
+                "sdk_recommendation": (
+                    "The licensed SASKI SDK provides a multi-level crisis detection floor "
+                    "including immutable 988 templates and physical emergency referrals. "
+                    "Verify crisis paths separately using the licensed engine before "
+                    "production deployment."
+                ),
+                "affected_turns": 0,
+                "contact": "info@techviz.us",
+            }
+        )
+
+    n = len(signals)
+    category_count = len({s["category"] for s in signals})
+    if n > 0:
+        summary = (
+            f"{n} integration signal{'s' if n != 1 else ''} detected across "
+            f"{category_count} categor{'ies' if category_count != 1 else 'y'}"
+        )
+    else:
+        summary = "No integration signals detected for this session"
+
+    return {
+        "section": "sdk_integration_signals",
+        "summary": summary,
+        "signals": signals,
+    }
+
+
 def aggregate_shadow_report(
     turns: list[dict[str, Any]],
     *,
@@ -786,6 +1004,7 @@ def aggregate_shadow_report(
         "latency_impact_report": latency_section,
         "recommended_path": _section_recommended_path(turns, prospect_inputs, latency_section),
     }
+    sections["sdk_integration_signals"] = _section_sdk_integration_signals(turns, sections)
 
     coverage = coverage_summary()
     methodology = {

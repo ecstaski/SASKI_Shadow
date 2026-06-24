@@ -214,7 +214,11 @@ awareness**. It is **not** a substitute for legal
 review, and using it does not mean an integrator's 
 AI is safe from violating laws not listed here. The 
 licensed SASKI engine provides broader, continuously 
-maintained, clinical-grade enforcement.
+maintained, clinical-grade enforcement. Contact 
+SASKI Institute at 
+[info@techviz.us](mailto:info@techviz.us) or 
+[www.techviz.us](https://www.techviz.us) to request 
+a licensed SDK evaluation.
 
 ---
 

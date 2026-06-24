@@ -63,7 +63,7 @@ def _sample_turns():
 def test_report_has_schema_version_and_eight_sections():
     report = aggregate_shadow_report(_sample_turns())
     assert report["schema_version"] == "shadow_report_v1"
-    assert len(report["sections"]) == 8
+    assert len(report["sections"]) == 9
 
 
 def test_absent_governance_tier_defaults_to_tier_clean():
@@ -135,7 +135,7 @@ def test_token_savings_nulls_when_inputs_missing():
     assert section["token_model"]["legacy_system_tokens_per_turn"] is None
     # Observed counts are still reported even without a model.
     assert section["measured_from_shadow"]["total_turns"] == 4
-    assert section["measured_from_shadow"]["blocked_llm_turns"] == 1
+    assert section["measured_from_shadow"]["would_have_blocked_turns"] == 1
 
 
 def test_token_savings_calculates_when_inputs_supplied():
@@ -265,7 +265,7 @@ def test_section2_example_attaches_signals_as_context_not_as_match_key():
     section = aggregate_shadow_report(turns)["sections"]["compliance_exposure_examples"]
     example = section["examples"][0]
     assert example["matched_laws"][0]["law_id"] == "US-UT-MENTAL-HEALTH-CHATBOT"
-    assert example["observed_signals"]["pii_detected"] is True
+    assert example["observed_signals"]["baseline_pii_signal"] is True
 
 
 def test_load_turns_jsonl_round_trip(tmp_path):
@@ -456,3 +456,23 @@ def test_generated_report_validates_against_bundled_schema():
     )
     # Raises jsonschema.ValidationError if report and schema ever drift apart.
     jsonschema.validate(instance=report, schema=schema)
+
+
+def test_section2_disclaimer_states_metadata_keyed_matching():
+    section = aggregate_shadow_report(_sample_turns())["sections"]["compliance_exposure_examples"]
+    assert "integrator-supplied jurisdiction and domain metadata" in section["disclaimer"]
+    assert "integrator-supplied jurisdiction and domain metadata" in COMPLIANCE_DISCLAIMER
+
+
+def test_section3_disclaimer_states_would_have_blocked_estimate_basis():
+    section = aggregate_shadow_report(_sample_turns())["sections"]["token_savings_calculation"]
+    assert "would_have_blocked signals" in section["disclaimer"]
+
+
+def test_section5_escalation_disclaimer_is_clean_and_unchanged():
+    section = aggregate_shadow_report(_sample_turns())["sections"]["escalation_signal_count"]
+    assert "not clinical crisis detection" in section["disclaimer"]
+    assert ESCALATION_DISCLAIMER == (
+        "Escalation counts reflect baseline distress phrase-list matches only and are "
+        "not clinical crisis detection."
+    )
