@@ -101,3 +101,32 @@ def test_match_returns_independent_copies():
     first[0]["note"] = "mutated"
     second = match_laws("US-NV", "mental_health")
     assert second[0]["note"] != "mutated"
+
+
+def test_single_string_domain_still_works():
+    # Backward compatibility: a single domain string behaves as before.
+    matched = match_laws("US", "csam")
+    assert matched
+    assert all(law["domain"] == "csam" for law in matched)
+
+
+def test_list_of_domains_returns_laws_from_each_domain():
+    matched = match_laws("US", ["consumer_chatbot", "csam"])
+    domains = {law["domain"] for law in matched}
+    assert "consumer_chatbot" in domains
+    assert "csam" in domains
+
+
+def test_child_turn_surfaces_both_coppa_and_a_csam_statute():
+    # Core child-facing coverage: a US child turn spanning both domains must
+    # surface COPPA (consumer_chatbot) and at least one CSAM statute (csam).
+    matched = match_laws("US", ["consumer_chatbot", "csam"])
+    ids = {law["law_id"] for law in matched}
+    assert "US-COPPA" in ids
+    assert any(law["domain"] == "csam" for law in matched)
+
+
+def test_multi_domain_results_have_no_duplicate_law_ids():
+    matched = match_laws("US", ["consumer_chatbot", "csam", "consumer_chatbot"])
+    ids = [law["law_id"] for law in matched]
+    assert len(ids) == len(set(ids))

@@ -89,3 +89,33 @@ def test_analyze_turn_passes_jurisdiction_and_domain_to_engine_summary():
     summary = result.metadata["engine_summary"]
     assert summary["user_jurisdiction"] == "US-CA"
     assert summary["domain"] == "healthcare"
+
+
+def test_mode_child_is_recorded_on_result_and_summary():
+    result = analyze_turn("the purple widget hums quietly", mode="child")
+    assert result.mode == "child"
+    assert result.metadata["engine_summary"]["mode"] == "child"
+
+
+def test_mode_none_is_recorded_as_none():
+    result = analyze_turn("the purple widget hums quietly", mode=None)
+    assert result.mode is None
+    assert result.metadata["engine_summary"]["mode"] is None
+
+
+def test_unrecognized_mode_falls_back_to_none():
+    result = analyze_turn("the purple widget hums quietly", mode="invalid_mode")
+    assert result.mode is None
+    assert result.metadata["engine_summary"]["mode"] is None
+
+
+def test_message_for_llm_carries_redacted_egress_payload():
+    result = analyze_turn("my ssn is 123-45-6789")
+    assert result.message_for_llm is not None
+    assert "123-45-6789" not in result.message_for_llm
+    assert "[REDACTED_SSN]" in result.message_for_llm
+
+
+def test_message_for_llm_passthrough_for_clean_text():
+    result = analyze_turn("the purple widget hums quietly")
+    assert result.message_for_llm == "the purple widget hums quietly"

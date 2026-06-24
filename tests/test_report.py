@@ -10,8 +10,10 @@ from saski_shadow.aggregate.report import (
     COMPLIANCE_DISCLAIMER,
     ESCALATION_DISCLAIMER,
     UPGRADE_MESSAGE,
+    _split_laws_by_effective_date,
     main,
 )
+from saski_shadow.laws import LAW_SET_VERSION, STARTER_LAWS
 
 HEX64_A = "a" * 64
 SCHEMA_PATH = (
@@ -318,6 +320,118 @@ def test_cli_aggregate_with_config_populates_token_savings(tmp_path):
     section = report["sections"]["token_savings_calculation"]
     assert section["basis"] == "estimated_from_integrator_inputs"
     assert section["savings"]["annual_usd_saved_estimate"] == 5580.0
+
+
+# --- Task 2: future-effective law split -------------------------------------
+
+
+def test_split_helper_classifies_past_null_and_future():
+    laws = [
+        {"law_id": "PAST", "effective_date": "2020-01-01"},
+        {"law_id": "NULL", "effective_date": ""},
+        {"law_id": "FUTURE", "effective_date": "2999-01-01"},
+    ]
+    in_force, future = _split_laws_by_effective_date(laws, "2026-06-24")
+    in_force_ids = {law["law_id"] for law in in_force}
+    future_ids = {law["law_id"] for law in future}
+    assert in_force_ids == {"PAST", "NULL"}
+    assert future_ids == {"FUTURE"}
+
+
+def test_section2_has_both_buckets_even_when_one_empty():
+    section = aggregate_shadow_report(_sample_turns())["sections"]["compliance_exposure_examples"]
+    by_status = section["matched_laws_by_status"]
+    assert set(by_status) == {"in_force", "future_effective"}
+    assert by_status["in_force"] == []
+    assert by_status["future_effective"] == []
+    assert section["law_match_summary"]["future_effective_count"] == 0
+
+
+def test_section2_future_effective_partitions_matched_laws_without_dropping():
+    # Real laws across several jurisdictions/domains; every matched law must
+    # land in exactly one bucket, and future-dated laws only in future_effective.
+    turns = [
+        _turn(0, "s1", jurisdiction="US-TN", domain="mental_health"),
+        _turn(1, "s2", jurisdiction="US-CA", domain="healthcare"),
+    ]
+    report = aggregate_shadow_report(turns)
+    section = report["sections"]["compliance_exposure_examples"]
+    today = report["generated_at_utc"][:10]
+
+    flat_ids = {law["law_id"] for law in section["matched_laws"]}
+    in_force = section["matched_laws_by_status"]["in_force"]
+    future = section["matched_laws_by_status"]["future_effective"]
+    in_ids = {law["law_id"] for law in in_force}
+    fut_ids = {law["law_id"] for law in future}
+
+    # No law dropped, no law double-counted across buckets.
+    assert in_ids | fut_ids == flat_ids
+    assert in_ids.isdisjoint(fut_ids)
+    assert section["law_match_summary"]["future_effective_count"] == len(future)
+    # Every future_effective law genuinely has a date after report generation.
+    assert all(law["effective_date"] > today for law in future)
+
+
+# --- Task 3: multi-domain wiring through the report pipeline -----------------
+
+
+def test_section2_multi_domain_turn_surfaces_both_domain_buckets():
+    turn = {
+        "turn_index": 0,
+        "session_id": "sess_child",
+        "jurisdiction": "US",
+        "domains": ["consumer_chatbot", "csam"],
+        "engine_summary": {"outcome": "allow"},
+    }
+    section = aggregate_shadow_report([turn])["sections"]["compliance_exposure_examples"]
+    unique = set(section["law_match_summary"]["unique_law_ids"])
+    assert "US-COPPA" in unique  # consumer_chatbot
+    assert any(law["domain"] == "csam" for law in section["matched_laws"])
+
+
+# --- Task 4: report credibility additions -----------------------------------
+
+
+def test_methodology_block_present_with_all_keys():
+    report = aggregate_shadow_report(_sample_turns())
+    methodology = report["methodology"]
+    assert set(methodology) == {
+        "detector_profile",
+        "law_set_version",
+        "law_set_sync_date",
+        "total_laws_evaluated",
+        "total_jurisdictions",
+        "schema_version",
+        "report_period",
+    }
+    assert methodology["detector_profile"] == "baseline-v1"
+    assert methodology["law_set_version"] == LAW_SET_VERSION
+    assert methodology["total_laws_evaluated"] == len(STARTER_LAWS)
+    assert set(methodology["report_period"]) == {"start_utc", "end_utc"}
+
+
+def test_detection_limitations_in_section_two_and_five():
+    sections = aggregate_shadow_report(_sample_turns())["sections"]
+    for name in ("compliance_exposure_examples", "escalation_signal_count"):
+        limitations = sections[name]["detection_limitations"]
+        assert isinstance(limitations, list) and limitations
+        assert any("CSAM" in item for item in limitations)
+
+
+def test_baseline_only_caveat_appears_when_section_count_is_zero():
+    # Clean turns: no PII, no escalation, no jurisdiction/domain metadata.
+    clean = [_turn(0, "s"), _turn(1, "s")]
+    sections = aggregate_shadow_report(clean)["sections"]
+    assert "baseline_only_caveat" in sections["pii_phi_detection_summary"]
+    assert "baseline_only_caveat" in sections["compliance_exposure_examples"]
+    assert "baseline_only_caveat" in sections["escalation_signal_count"]
+
+
+def test_baseline_only_caveat_absent_when_section_count_nonzero():
+    # _sample_turns has one PII turn and one escalation turn.
+    sections = aggregate_shadow_report(_sample_turns())["sections"]
+    assert "baseline_only_caveat" not in sections["pii_phi_detection_summary"]
+    assert "baseline_only_caveat" not in sections["escalation_signal_count"]
 
 
 def test_generated_report_validates_against_bundled_schema():

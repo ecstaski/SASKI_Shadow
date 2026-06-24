@@ -44,6 +44,24 @@ _DEFAULT_POLICY_ID = "baseline-v1"
 _VALID_ENFORCEMENT_MODES = {"enforce", "shadow", "warn"}
 _VALID_JURISDICTION_SOURCES = {"integrator_supplied", "not_provided", "unknown"}
 
+# Public, non-proprietary operating-mode vocabulary. mode is a reporting tag
+# only; enforcement behavior lives in the licensed SDK. An unrecognized value
+# falls back to None silently.
+_VALID_MODES = {
+    "child",
+    "student",
+    "patient",
+    "therapist",
+    "mental_health_support",
+    "wellness_coaching",
+    "career_coaching",
+    "sports_coaching",
+    "business",
+    "general_assistant",
+    "hr_recruiting",
+    "default",
+}
+
 
 @dataclass
 class BaselineAnalysisResult:
@@ -62,6 +80,12 @@ class BaselineAnalysisResult:
     model_id: str | None
     provider_id: str | None
     metadata: dict[str, Any] | None
+    # mode is a reporting tag only; enforcement behavior lives in the licensed SDK.
+    mode: str | None = None
+    # Redacted egress payload (PII placeholders applied) that an integrator would
+    # send to the LLM. Carries no raw PII; it is the text the message_for_llm_hash
+    # was computed over.
+    message_for_llm: str | None = None
 
     def get_audit_record(self) -> dict[str, Any]:
         summary = (self.metadata or {}).get("engine_summary", {})
@@ -134,6 +158,14 @@ def _enforcement_mode(session_context: dict[str, Any]) -> str:
     return mode if mode in _VALID_ENFORCEMENT_MODES else "shadow"
 
 
+def _normalize_mode(mode: str | None) -> str | None:
+    # mode is a reporting tag only; enforcement behavior lives in the licensed
+    # SDK. Unrecognized values fall back to None silently.
+    if isinstance(mode, str) and mode in _VALID_MODES:
+        return mode
+    return None
+
+
 def _jurisdiction_source(session_context: dict[str, Any]) -> str:
     supplied = session_context.get("jurisdiction_source")
     if isinstance(supplied, str) and supplied in _VALID_JURISDICTION_SOURCES:
@@ -147,9 +179,29 @@ def analyze_turn(
     message: str,
     session_context: dict | None = None,
     policy: dict | None = None,
+    mode: str | None = None,
 ) -> BaselineAnalysisResult:
-    """Run the ordered public baseline pipeline on a single user message."""
+    """Run the ordered public baseline pipeline on a single user message.
+
+    Args:
+        message: The raw user message to analyze.
+        session_context: Optional integrator-supplied context (enforcement_mode,
+            user_jurisdiction, domain, assistant_output, etc.). Values are passed
+            through factually and are not interpreted as safety signals.
+        policy: Optional integrator policy dict evaluated against turn signals.
+        mode: Optional public operating-mode tag (e.g. ``"child"``,
+            ``"patient"``, ``"general_assistant"``). It is recorded on the result
+            and mirrored into ``engine_summary`` for reporting only. mode is a
+            reporting tag only; enforcement behavior lives in the licensed SDK.
+            It attaches no threshold, scoring, or PII-tier logic at this layer.
+            An unrecognized value falls back to ``None`` silently.
+
+    Returns:
+        A ``BaselineAnalysisResult`` compatible with the ``AnalysisResult``
+        protocol.
+    """
     session_context = session_context or {}
+    normalized_mode = _normalize_mode(mode)
     timings: dict[str, float] = {}
     started = perf_counter()
 
@@ -277,6 +329,8 @@ def analyze_turn(
         "phase_timings": timings,
         "user_jurisdiction": str(user_jurisdiction) if user_jurisdiction else None,
         "domain": str(domain) if domain else None,
+        # mode is a reporting tag only; enforcement behavior lives in the licensed SDK.
+        "mode": normalized_mode,
     }
 
     metadata = {
@@ -301,4 +355,6 @@ def analyze_turn(
         model_id=None,
         provider_id=None,
         metadata=metadata,
+        mode=normalized_mode,
+        message_for_llm=redacted_message,
     )

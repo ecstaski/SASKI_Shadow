@@ -17,3 +17,11 @@ repomix-output*
 
 # Integrator runtime turn stores (hash-only payloads, not source)
 *.jsonl
+
+# Never commit real or example env files
+.env
+.env.example
+saski_shadow_config.json
+
+# Session runner output (turn stores, logs, generated reports)
+outputs/

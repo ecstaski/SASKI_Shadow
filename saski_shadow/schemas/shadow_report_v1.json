@@ -22,6 +22,26 @@
         "end_utc": { "type": ["string", "null"], "format": "date-time" }
       }
     },
+    "methodology": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "detector_profile": { "type": "string" },
+        "law_set_version": { "type": "string" },
+        "law_set_sync_date": { "type": "string" },
+        "total_laws_evaluated": { "type": "integer", "minimum": 0 },
+        "total_jurisdictions": { "type": "integer", "minimum": 0 },
+        "schema_version": { "type": "string" },
+        "report_period": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "start_utc": { "type": ["string", "null"] },
+            "end_utc": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
     "sections": {
       "type": "object",
       "required": [
@@ -91,6 +111,7 @@
       "required": ["section", "totals", "by_pii_type", "history_redaction", "examples"],
       "properties": {
         "section": { "type": "string", "const": "pii_phi_detection_summary" },
+        "baseline_only_caveat": { "type": "string" },
         "period": {
           "type": "object",
           "properties": {
@@ -158,6 +179,8 @@
         "section": { "type": "string", "const": "compliance_exposure_examples" },
         "disclaimer": { "type": "string" },
         "upgrade_path": { "type": "string" },
+        "detection_limitations": { "type": "array", "items": { "type": "string" } },
+        "baseline_only_caveat": { "type": "string" },
         "jurisdiction_config": {
           "type": "object",
           "additionalProperties": false,
@@ -176,7 +199,10 @@
               "session_id": { "type": "string" },
               "deployment_profile": { "type": ["string", "null"] },
               "user_jurisdiction": { "type": ["string", "null"] },
-              "domain": { "type": ["string", "null"] },
+              "domain": {
+                "type": ["string", "array", "null"],
+                "items": { "type": "string" }
+              },
               "jurisdiction_source": {
                 "type": ["string", "null"],
                 "enum": ["integrator_supplied", "not_provided", "unknown", null]
@@ -214,6 +240,14 @@
           "type": "array",
           "items": { "$ref": "#/$defs/starter_law" }
         },
+        "matched_laws_by_status": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "in_force": { "type": "array", "items": { "$ref": "#/$defs/starter_law" } },
+            "future_effective": { "type": "array", "items": { "$ref": "#/$defs/starter_law" } }
+          }
+        },
         "law_match_summary": {
           "type": "object",
           "additionalProperties": false,
@@ -221,6 +255,7 @@
             "turns_with_jurisdiction_metadata": { "type": "integer", "minimum": 0 },
             "turns_with_law_match": { "type": "integer", "minimum": 0 },
             "unique_law_ids": { "type": "array", "items": { "type": "string" } },
+            "future_effective_count": { "type": "integer", "minimum": 0 },
             "no_match_statement": { "type": ["string", "null"] }
           }
         },
@@ -322,6 +357,8 @@
         "section": { "type": "string", "const": "escalation_signal_count" },
         "disclaimer": { "type": "string" },
         "upgrade_path": { "type": "string" },
+        "detection_limitations": { "type": "array", "items": { "type": "string" } },
+        "baseline_only_caveat": { "type": "string" },
         "totals": {
           "type": "object",
           "additionalProperties": false,

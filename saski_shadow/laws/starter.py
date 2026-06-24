@@ -20,12 +20,21 @@ Jurisdiction matching is hierarchical on ``-`` segments: a law applies to a
 turn when the law's jurisdiction is an equal-or-broader prefix of the turn's.
 So a turn in ``US-NY-NYC`` matches laws scoped to ``US``, ``US-NY``, and
 ``US-NY-NYC``; a turn in ``US-NY`` does not match a city-specific
-``US-NY-NYC`` law. Domain matching is exact.
+``US-NY-NYC`` law. Domain matching is exact, and ``match_laws`` accepts either
+a single domain string or a list of domain strings so one turn can surface
+laws across multiple domains.
 """
 
 from __future__ import annotations
 
 from typing import Any
+
+# Version stamp for this manually synced starter set. ``LAW_SET_SYNC_DATE`` is
+# the date of the last deliberate resync from saski-law-registry (documented in
+# SYNC.md / SHADOW_FOLLOWUP.md), not the date this file was last touched for
+# unrelated reasons. Update both when the law data is resynced.
+LAW_SET_VERSION = "2026.06.23"
+LAW_SET_SYNC_DATE = "2026-06-23"
 
 # Public law facts. ``law_id`` is an opaque label; ``jurisdiction`` is the
 # functional matching key. The two strings need not mirror each other.
@@ -700,23 +709,41 @@ def _jurisdiction_applies(law_jurisdiction: str, turn_jurisdiction: str) -> bool
 
 
 def match_laws(jurisdiction: Any, domain: Any) -> list[dict[str, str]]:
-    """Return starter laws matching a turn's jurisdiction (hierarchical) and domain (exact).
+    """Return starter laws matching a turn's jurisdiction (hierarchical) and domain(s) (exact).
 
-    Returns an empty list when either value is missing or nothing matches. The
-    caller is expected to report an empty result plainly rather than guess.
+    ``domain`` accepts either a single domain string or a list of domain
+    strings. A single string is treated as a one-element list, so a child-facing
+    turn can surface laws across multiple domains in one call (for example
+    ``["consumer_chatbot", "csam"]`` returns both COPPA and the CSAM statutes).
+    Jurisdiction matching remains hierarchical; domain matching remains exact.
+
+    Returns an empty list when the jurisdiction is missing, no usable domain is
+    supplied, or nothing matches. Results are deduplicated by ``law_id`` and
+    sorted by ``law_id``. The caller is expected to report an empty result
+    plainly rather than guess.
     """
     if not isinstance(jurisdiction, str) or not jurisdiction:
         return []
-    if not isinstance(domain, str) or not domain:
+
+    # Normalize the domain argument to a list of non-empty domain strings.
+    if isinstance(domain, str):
+        domains = [domain] if domain else []
+    elif isinstance(domain, list):
+        domains = [d for d in domain if isinstance(d, str) and d]
+    else:
+        domains = []
+    if not domains:
         return []
 
-    matched = [
-        dict(law)
-        for law in STARTER_LAWS
-        if law["domain"] == domain and _jurisdiction_applies(law["jurisdiction"], jurisdiction)
-    ]
-    matched.sort(key=lambda law: law["law_id"])
-    return matched
+    domain_set = set(domains)
+    matched_by_id: dict[str, dict[str, str]] = {}
+    for law in STARTER_LAWS:
+        if law["domain"] in domain_set and _jurisdiction_applies(
+            law["jurisdiction"], jurisdiction
+        ):
+            matched_by_id.setdefault(law["law_id"], dict(law))
+
+    return [matched_by_id[law_id] for law_id in sorted(matched_by_id)]
 
 
 def _state_of(jurisdiction: str) -> str:

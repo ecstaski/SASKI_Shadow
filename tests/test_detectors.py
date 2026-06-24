@@ -80,3 +80,24 @@ def test_output_review_flags_integrator_boundary_phrase():
 
 def test_registry_exposes_four_detectors():
     assert set(DETECTORS) == {"pii", "distress", "policy", "output_review"}
+
+
+def test_distress_extra_indicator_does_not_match_substring_of_larger_word():
+    # Word-boundary precision: a 'sad' indicator must NOT match 'Saddleback'.
+    result = detect_distress("Saddleback mountain trail", extra_indicators=["sad"])
+    assert result.escalation_detected is False
+
+
+def test_distress_extra_indicator_matches_whole_word():
+    # The same indicator still fires on a genuine whole-word occurrence.
+    result = detect_distress("honestly I feel sad today", extra_indicators=["sad"])
+    assert result.escalation_detected is True
+    assert "sad" in result.matched_indicators
+
+
+def test_distress_multi_word_indicator_respects_word_boundaries():
+    indicators = ["want to hurt"]
+    hit = detect_distress("I want to hurt myself", extra_indicators=indicators)
+    miss = detect_distress("I want to hurtle down the slope", extra_indicators=indicators)
+    assert hit.escalation_detected is True
+    assert miss.escalation_detected is False

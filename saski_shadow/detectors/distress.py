@@ -17,6 +17,7 @@ observed with ``enforcement_suppressed`` True rather than acted upon.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 # Phrase list intentionally uses synthetic tokens. Real indicator content is
@@ -48,7 +49,17 @@ def detect_distress(
     if extra_indicators:
         indicators.extend(str(phrase).lower() for phrase in extra_indicators)
 
-    matched = [phrase for phrase in indicators if phrase in haystack]
+    # Matching strategy (changed): the previous implementation used unbounded
+    # substring matching (``phrase in haystack``), which fired an indicator like
+    # "sad" inside larger words such as "Saddleback". It now uses word-boundary
+    # matching so an indicator only matches whole-word occurrences: "sad" hits
+    # "I feel sad today" but not "Saddleback mountain". No threshold, weighting,
+    # or indicator-list change is introduced.
+    matched = [
+        phrase
+        for phrase in indicators
+        if re.search(r"\b" + re.escape(phrase) + r"\b", haystack, re.IGNORECASE)
+    ]
     # De-duplicate while preserving first-seen order.
     seen: set[str] = set()
     unique = [p for p in matched if not (p in seen or seen.add(p))]

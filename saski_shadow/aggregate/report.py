@@ -18,7 +18,13 @@ from datetime import datetime, timezone
 from typing import Any
 
 from ..enums import PublicOutcome
-from ..laws import match_laws
+from ..laws import (
+    LAW_SET_SYNC_DATE,
+    LAW_SET_VERSION,
+    STARTER_LAWS,
+    coverage_summary,
+    match_laws,
+)
 
 # Required messaging strings.
 COMPLIANCE_DISCLAIMER = (
@@ -39,6 +45,21 @@ TOKEN_SAVINGS_DISCLAIMER = (
     "per-turn token figures x integrator unit price). It embeds no proprietary "
     "SASKI prompt-assembly constants or hidden savings assumptions. Every output "
     "is null unless the inputs it depends on are supplied."
+)
+
+# Honest scope statements surfaced inside detection-bearing sections so a
+# reader cannot mistake baseline observation for full enforcement coverage.
+DETECTION_LIMITATIONS = [
+    "CSAM content detection requires an upstream classifier; this package does not detect CSAM.",
+    "Distress detection uses integrator-supplied indicators only; baseline synthetic tokens are placeholders.",
+    "Law matching uses integrator-supplied jurisdiction and domain metadata; no content-based jurisdiction inference.",
+    "future_effective laws are surfaced for awareness and are not currently enforceable.",
+]
+
+# Attached alongside a zero detection count so an empty result is never read as
+# a clean bill of health.
+BASELINE_ONLY_CAVEAT = (
+    "Baseline detection only. Absence of a finding is not evidence of compliance."
 )
 
 # Section 3 basis labels: makes it explicit whether numbers were calculated.
@@ -75,6 +96,34 @@ def load_turns_jsonl(path: str) -> list[dict[str, Any]]:
 
 def _now_utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _today_utc() -> str:
+    """Report-generation date (UTC) used to classify law effective dates."""
+    return datetime.now(timezone.utc).date().isoformat()
+
+
+def _split_laws_by_effective_date(
+    laws: list[dict[str, str]],
+    today_iso: str,
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    """Partition matched laws into (in_force, future_effective) buckets.
+
+    A law is ``in_force`` when its ``effective_date`` is absent/blank or is a
+    date on or before ``today_iso`` (ISO ``YYYY-MM-DD`` strings compare
+    correctly lexicographically). It is ``future_effective`` only when its
+    ``effective_date`` is a parseable date strictly after today. Laws are never
+    dropped; an unparseable date is treated conservatively as in_force.
+    """
+    in_force: list[dict[str, str]] = []
+    future: list[dict[str, str]] = []
+    for law in laws:
+        effective = str(law.get("effective_date") or "").strip()
+        if len(effective) == 10 and effective > today_iso:
+            future.append(law)
+        else:
+            in_force.append(law)
+    return in_force, future
 
 
 def _num(value: Any) -> float | None:
@@ -155,7 +204,7 @@ def _section_pii(turns: list[dict[str, Any]], period: dict[str, Any]) -> dict[st
                 )
 
     total = len(turns)
-    return {
+    section = {
         "section": "pii_phi_detection_summary",
         "period": dict(period),
         "totals": {
@@ -170,6 +219,9 @@ def _section_pii(turns: list[dict[str, Any]], period: dict[str, Any]) -> dict[st
         },
         "examples": examples,
     }
+    if turns_with_pii == 0:
+        section["baseline_only_caveat"] = BASELINE_ONLY_CAVEAT
+    return section
 
 
 def _compliance_decisions(turn: dict[str, Any]) -> list[dict[str, Any]]:
@@ -188,10 +240,28 @@ def _turn_jurisdiction(turn: dict[str, Any], prospect_inputs: dict[str, Any]) ->
     return str(value) if value else None
 
 
-def _turn_domain(turn: dict[str, Any], prospect_inputs: dict[str, Any]) -> str | None:
+def _turn_domain(
+    turn: dict[str, Any], prospect_inputs: dict[str, Any]
+) -> str | list[str] | None:
+    """Resolve the domain(s) for a turn, passed straight to ``match_laws``.
+
+    Precedence: an explicit ``domains`` list on the turn, then a per-turn
+    ``domain`` (string or list), then the engine_summary passthrough, then a
+    single report-level fallback. A single string stays a string for full
+    backward compatibility; a list is passed through so one turn can surface
+    laws across multiple domains.
+    """
+    plural = turn.get("domains")
+    if isinstance(plural, list):
+        cleaned = [str(d) for d in plural if isinstance(d, str) and d]
+        return cleaned or None
+
     value = turn.get("domain") or _engine_summary(turn).get("domain")
     if not value:
         value = prospect_inputs.get("domain")
+    if isinstance(value, list):
+        cleaned = [str(d) for d in value if isinstance(d, str) and d]
+        return cleaned or None
     return str(value) if value else None
 
 
@@ -282,21 +352,35 @@ def _section_compliance(turns: list[dict[str, Any]], prospect_inputs: dict[str, 
             "No laws in the starter set matched the supplied jurisdiction/domain metadata."
         )
 
+    # Label-and-surface (never filter) future-effective laws so a compliance
+    # reader sees what is coming as well as what is already in force.
+    in_force_laws, future_effective_laws = _split_laws_by_effective_date(
+        matched_laws, _today_utc()
+    )
+
     active = prospect_inputs.get("active_jurisdictions") or []
-    return {
+    section = {
         "section": "compliance_exposure_examples",
         "disclaimer": COMPLIANCE_DISCLAIMER,
         "upgrade_path": UPGRADE_MESSAGE,
+        "detection_limitations": list(DETECTION_LIMITATIONS),
         "jurisdiction_config": {
             "active_jurisdictions": list(active),
             "user_jurisdiction_injected": user_jurisdiction_injected,
         },
         "examples": examples,
         "matched_laws": matched_laws,
+        # Additive lifecycle view; matched_laws above stays the flat list for
+        # backward compatibility.
+        "matched_laws_by_status": {
+            "in_force": in_force_laws,
+            "future_effective": future_effective_laws,
+        },
         "law_match_summary": {
             "turns_with_jurisdiction_metadata": turns_with_jurisdiction_metadata,
             "turns_with_law_match": turns_with_law_match,
             "unique_law_ids": [law["law_id"] for law in matched_laws],
+            "future_effective_count": len(future_effective_laws),
             "no_match_statement": no_match_statement,
         },
         "aggregate": {
@@ -305,6 +389,9 @@ def _section_compliance(turns: list[dict[str, Any]], prospect_inputs: dict[str, 
             "unique_reason_codes": sorted(reason_codes),
         },
     }
+    if turns_with_law_match == 0:
+        section["baseline_only_caveat"] = BASELINE_ONLY_CAVEAT
+    return section
 
 
 def _section_token_savings(
@@ -469,10 +556,11 @@ def _section_escalation(turns: list[dict[str, Any]]) -> dict[str, Any]:
                 )
 
     total = len(turns)
-    return {
+    section = {
         "section": "escalation_signal_count",
         "disclaimer": ESCALATION_DISCLAIMER,
         "upgrade_path": UPGRADE_MESSAGE,
+        "detection_limitations": list(DETECTION_LIMITATIONS),
         "totals": {
             "turns_processed": total,
             "escalation_turns": escalation_turns,
@@ -483,6 +571,9 @@ def _section_escalation(turns: list[dict[str, Any]]) -> dict[str, Any]:
         "by_risk_band": by_risk,
         "examples": examples,
     }
+    if escalation_turns == 0:
+        section["baseline_only_caveat"] = BASELINE_ONLY_CAVEAT
+    return section
 
 
 def _section_unsafe_flows(turns: list[dict[str, Any]]) -> dict[str, Any]:
@@ -696,10 +787,25 @@ def aggregate_shadow_report(
         "recommended_path": _section_recommended_path(turns, prospect_inputs, latency_section),
     }
 
+    coverage = coverage_summary()
+    methodology = {
+        "detector_profile": "baseline-v1",
+        "law_set_version": LAW_SET_VERSION,
+        "law_set_sync_date": LAW_SET_SYNC_DATE,
+        "total_laws_evaluated": len(STARTER_LAWS),
+        "total_jurisdictions": coverage["total_states"],
+        "schema_version": "shadow_report_v1",
+        "report_period": {
+            "start_utc": period.get("start_utc"),
+            "end_utc": period.get("end_utc"),
+        },
+    }
+
     return {
         "schema_version": "shadow_report_v1",
         "generated_at_utc": _now_utc_iso(),
         "period": period,
+        "methodology": methodology,
         "sections": sections,
     }
 

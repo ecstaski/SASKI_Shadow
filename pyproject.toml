@@ -31,6 +31,11 @@ dev = [
   "pytest>=7.0",
   "black>=23.0",
   "ruff>=0.1.0",
+  "python-dotenv>=1.0",
+]
+live-tests = [
+  "anthropic>=0.34",
+  "openai>=1.0",
 ]
 saski-sdk = [
   "sasi-sdk>=1.6.4",
@@ -49,7 +54,8 @@ packages = ["saski_shadow"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = ["test_*.py"]
+# Harness axis files are named axis*.py and are collected alongside test_*.py.
+python_files = ["test_*.py", "axis*.py"]
 
 [tool.black]
 line-length = 100

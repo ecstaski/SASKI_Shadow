@@ -9,6 +9,7 @@ optional integration adapter.
 
 from __future__ import annotations
 
+from .adapter import result_to_jsonl_turn
 from .aggregate.report import aggregate_shadow_report, load_turns_jsonl
 from .deployment import DeploymentMode, evaluate_deployment_mode
 from .enums import ExportActionLabel, ModeTag, OutcomeStatus, PublicOutcome
@@ -57,4 +58,5 @@ __all__ = [
     "update_bundle_outcome",
     "aggregate_shadow_report",
     "load_turns_jsonl",
+    "result_to_jsonl_turn",
 ]
