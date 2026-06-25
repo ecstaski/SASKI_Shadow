@@ -120,9 +120,18 @@ def test_each_single_domain_request_returns_only_that_domain():
 
 def test_future_and_in_force_laws_bucket_correctly():
     today = _today_utc()
+
+    # Mirror production semantics (_split_laws_by_effective_date): a law is
+    # future-effective only when it has a parseable YYYY-MM-DD date strictly
+    # after today. A missing/blank/None effective_date (e.g. a pending bill)
+    # is treated as in-force, so comparisons never assume a string is present.
+    def _is_future(effective_date: object) -> bool:
+        ed = str(effective_date or "").strip()
+        return len(ed) == 10 and ed > today
+
     # Read effective dates from the data; do not hardcode.
-    future_laws = [law for law in STARTER_LAWS if law["effective_date"] > today]
-    past_laws = [law for law in STARTER_LAWS if law["effective_date"] <= today]
+    future_laws = [law for law in STARTER_LAWS if _is_future(law["effective_date"])]
+    past_laws = [law for law in STARTER_LAWS if not _is_future(law["effective_date"])]
     assert future_laws, "registry has no future-effective laws to validate against"
     assert past_laws, "registry has no in-force laws to validate against"
 

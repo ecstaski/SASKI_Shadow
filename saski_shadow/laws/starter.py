@@ -696,6 +696,15 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
         "date_added": "2026-06-23",
         "note": "Prohibits discrimination on the basis of race, color, national origin, sex, age, or disability in health programs and activities receiving federal financial assistance. The 2024 final rule (effective July 5, 2024) expressly addresses patient care decision support tools, prohibiting covered entities from discriminating through their use. AI-powered clinical decision support, triage, and diagnostic tools deployed by covered healthcare entities are subject to non-discrimination requirements under this rule. Note: provisions relating to gender identity are subject to ongoing litigation and partial judicial stays in certain jurisdictions as of June 2026; the race, color, national origin, age, and disability provisions are fully in effect. Enforced by the HHS Office for Civil Rights.",
     },
+    {
+        "law_id": "US-NY-MH-OVERSIGHT",
+        "jurisdiction": "US-NY",
+        "domain": "mental_health",
+        "citation": "S.8484 / A.9106, 2025-2026 New York State Legislature (proposed N.Y. Education Law § 6517)",
+        "effective_date": None,
+        "date_added": "2026-06-24",
+        "note": "This pending bill would amend New York's Education Law to bar any person or entity from offering therapy or psychotherapy to the public — including through internet-based artificial intelligence — unless the care is delivered by a licensed professional. A licensed professional could use AI only for administrative or supplementary tasks and would be prohibited from allowing AI to make independent therapeutic decisions, to interact directly with clients in therapeutic communication, or to generate treatment recommendations without the professional's review and approval. Where AI assists during a recorded or transcribed session, the patient must be informed in writing of the specific purpose and provide consent, and violations would carry civil penalties of up to $50,000 each.",
+    },
 )
 
 

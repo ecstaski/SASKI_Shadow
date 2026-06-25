@@ -24,7 +24,7 @@ def test_readme_law_coverage_counts_match_starter_set():
 
 
 def test_starter_set_has_expected_count_and_fact_only_fields():
-    assert len(STARTER_LAWS) == 73
+    assert len(STARTER_LAWS) == 74
     required = {
         "law_id",
         "jurisdiction",

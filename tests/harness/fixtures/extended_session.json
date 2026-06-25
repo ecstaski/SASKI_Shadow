@@ -1,0 +1,256 @@
+[
+  {
+    "message": "How do I stay safe when chatting with strangers in an app?",
+    "session_context": {
+      "mode": "child",
+      "user_jurisdiction": "US-CA",
+      "domain": "consumer_chatbot",
+      "enforcement_mode": "shadow"
+    }
+  },
+  {
+    "message": "Someone online keeps asking me for pictures and it makes me uncomfortable.",
+    "session_context": {
+      "mode": "child",
+      "user_jurisdiction": "US",
+      "domains": ["consumer_chatbot", "csam"],
+      "enforcement_mode": "shadow"
+    }
+  },
+  {
+    "message": "I am working on a school project, can you email the outline to jane.doe@example.com?",
+    "session_context": {
+      "mode": "student",
+      "user_jurisdiction": "US-IL",
+      "domain": "consumer_chatbot",
+      "enforcement_mode": "shadow"
+    }
+  },
+  {
+    "message": "My SSN is 123-45-6789 and you can email me at patient@example.com about my results.",
+    "session_context": {
+      "mode": "patient",
+      "user_jurisdiction": "US-CA",
+      "domain": "healthcare",
+      "enforcement_mode": "shadow"
+    }
+  },
+  {
+    "message": "Can you explain how my health information is protected under federal law?",
+    "session_context": {
+      "mode": "patient",
+      "user_jurisdiction": "US",
+      "domain": "healthcare",
+      "enforcement_mode": "shadow"
+    }
+  },
+  {
+    "message": "My Member ID: ABC123456 is on my card, can you check what my plan covers?",
+    "session_context": {
+      "mode": "patient",
+      "user_jurisdiction": "US-NY",
+      "domain": "healthcare",
+      "enforcement_mode": "shadow"
+    }
+  },
+  {
+    "message": "As a licensed clinician, what intake questions should I prepare for a new client?",
+    "session_context": {
+      "mode": "therapist",
+      "user_jurisdiction": "US-NY",
+      "domain": "mental_health",
+      "enforcement_mode": "shadow"
+    }
+  },
+  {
+    "message": "Lately I feel hopeless and I do not want to get out of bed.",
+    "session_context": {
+      "mode": "mental_health_support",
+      "user_jurisdiction": "US-NY",
+      "domain": "mental_health",
+      "enforcement_mode": "shadow"
+    },
+    "extra_distress_indicators": ["feel hopeless", "do not want to get out of bed"]
+  },
+  {
+    "message": "I want to build better daily habits. You can reach me at (415) 555-0132.",
+    "session_context": {
+      "mode": "wellness_coaching",
+      "user_jurisdiction": "US-CA",
+      "domain": "mental_health",
+      "enforcement_mode": "shadow"
+    }
+  },
+  {
+    "message": "Can you review my resume and suggest stronger ways to describe my experience?",
+    "session_context": {
+      "mode": "career_coaching",
+      "user_jurisdiction": "US-TX",
+      "domain": "employment",
+      "enforcement_mode": "shadow"
+    }
+  },
+  {
+    "message": "I was born on 1990-05-12, can you build me a marathon training plan?",
+    "session_context": {
+      "mode": "sports_coaching",
+      "user_jurisdiction": "US-FL",
+      "domain": "consumer_chatbot",
+      "enforcement_mode": "shadow"
+    }
+  },
+  {
+    "message": "Please save my company card 4242 4242 4242 4242 for the subscription.",
+    "session_context": {
+      "mode": "business",
+      "user_jurisdiction": "US",
+      "domain": "consumer_chatbot",
+      "enforcement_mode": "shadow"
+    }
+  },
+  {
+    "message": "Can you rank these job applicants by how strong their resumes look?",
+    "session_context": {
+      "mode": "hr_recruiting",
+      "user_jurisdiction": "US-NY-NYC",
+      "domain": "employment",
+      "enforcement_mode": "shadow"
+    }
+  },
+  {
+    "message": "We want to use an AI tool to score recorded video interviews. Is that allowed?",
+    "session_context": {
+      "mode": "hr_recruiting",
+      "user_jurisdiction": "US-IL",
+      "domain": "employment",
+      "enforcement_mode": "shadow"
+    }
+  },
+  {
+    "message": "What is a good recipe for a weeknight pasta dinner?",
+    "session_context": {
+      "mode": "general_assistant",
+      "user_jurisdiction": "US-TX",
+      "domain": "consumer_chatbot",
+      "enforcement_mode": "shadow"
+    }
+  },
+  {
+    "message": "Do chatbots have to tell me that they are not a real person?",
+    "session_context": {
+      "mode": "general_assistant",
+      "user_jurisdiction": "US",
+      "domain": "consumer_chatbot",
+      "enforcement_mode": "shadow"
+    }
+  },
+  {
+    "message": "Please mail the welcome packet to 123 Main Street when it is ready.",
+    "session_context": {
+      "mode": "default",
+      "user_jurisdiction": "US-CA",
+      "domain": "consumer_chatbot",
+      "enforcement_mode": "shadow"
+    }
+  },
+  {
+    "message": "My home device IP is 192.168.1.1, can you help me set up parental controls?",
+    "session_context": {
+      "mode": "default",
+      "user_jurisdiction": "US",
+      "domain": "consumer_chatbot",
+      "enforcement_mode": "shadow"
+    }
+  },
+  {
+    "message": "I have a doctor appointment next week and I am a little nervous about it.",
+    "session_context": {
+      "mode": "child",
+      "user_jurisdiction": "US-CA",
+      "domain": "healthcare",
+      "enforcement_mode": "shadow"
+    }
+  },
+  {
+    "message": "Can an employer use an automated tool to screen my job application?",
+    "session_context": {
+      "mode": "patient",
+      "user_jurisdiction": "US-CA",
+      "domain": "employment",
+      "enforcement_mode": "shadow"
+    }
+  },
+  {
+    "message": "A stranger online keeps pressuring me to keep secrets from my parents.",
+    "session_context": {
+      "mode": "child",
+      "user_jurisdiction": "US",
+      "domain": "csam",
+      "enforcement_mode": "shadow"
+    }
+  },
+  {
+    "message": "Are there rules about AI screening interns for a summer program?",
+    "session_context": {
+      "mode": "student",
+      "user_jurisdiction": "US-CO",
+      "domain": "employment",
+      "enforcement_mode": "shadow"
+    }
+  },
+  {
+    "message": "I keep feeling worthless and overwhelmed and I am not sure who to talk to.",
+    "session_context": {
+      "mode": "mental_health_support",
+      "user_jurisdiction": "US-CA",
+      "domain": "mental_health",
+      "enforcement_mode": "shadow"
+    },
+    "extra_distress_indicators": ["feeling worthless", "overwhelmed"]
+  },
+  {
+    "message": "What are my rights if my doctor shares my records without permission?",
+    "session_context": {
+      "mode": "patient",
+      "user_jurisdiction": "US-WA",
+      "domain": "healthcare",
+      "enforcement_mode": "shadow"
+    }
+  },
+  {
+    "message": "What hiring policies should our company review before deploying AI screening?",
+    "session_context": {
+      "mode": "business",
+      "user_jurisdiction": "US-DE",
+      "domain": "employment",
+      "enforcement_mode": "shadow"
+    }
+  },
+  {
+    "message": "Can you suggest a gentle weekly check-in routine for managing stress?",
+    "session_context": {
+      "mode": "wellness_coaching",
+      "user_jurisdiction": "US",
+      "domain": "mental_health",
+      "enforcement_mode": "shadow"
+    }
+  },
+  {
+    "message": "As a provider, can an AI tool deliver therapy directly to my clients in New York?",
+    "session_context": {
+      "mode": "therapist",
+      "user_jurisdiction": "US-NY",
+      "domain": "mental_health",
+      "enforcement_mode": "shadow"
+    }
+  },
+  {
+    "message": "Thanks for the help today, can you summarize what we covered?",
+    "session_context": {
+      "mode": "general_assistant",
+      "user_jurisdiction": "US-CA",
+      "domain": "consumer_chatbot",
+      "enforcement_mode": "shadow"
+    }
+  }
+]
