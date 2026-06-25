@@ -61,8 +61,10 @@ TOKEN_SAVINGS_DISCLAIMER = (
 # reader cannot mistake baseline observation for full enforcement coverage.
 DETECTION_LIMITATIONS = [
     "CSAM content detection requires an upstream classifier; this package does not detect CSAM.",
-    "Distress detection uses integrator-supplied indicators only; baseline synthetic tokens are placeholders.",
-    "Law matching uses integrator-supplied jurisdiction and domain metadata; no content-based jurisdiction inference.",
+    "Distress detection uses integrator-supplied indicators only; baseline "
+    "synthetic tokens are placeholders.",
+    "Law matching uses integrator-supplied jurisdiction and domain metadata; "
+    "no content-based jurisdiction inference.",
     "future_effective laws are surfaced for awareness and are not currently enforceable.",
 ]
 
@@ -108,7 +110,7 @@ _TIERS = ("tier_clean", "tier_warning", "tier_escalation")
 def load_turns_jsonl(path: str) -> list[dict[str, Any]]:
     """Load one JSON object per line from integrator turn store."""
     turns: list[dict[str, Any]] = []
-    with open(path, "r", encoding="utf-8") as handle:
+    with open(path, encoding="utf-8") as handle:
         for line in handle:
             line = line.strip()
             if not line:
@@ -200,7 +202,7 @@ def _percentile(values: list[float], pct: float) -> float:
 
 
 def _section_pii(turns: list[dict[str, Any]], period: dict[str, Any]) -> dict[str, Any]:
-    by_type = {key: 0 for key in (*_PII_BUCKETS, "other")}
+    by_type = dict.fromkeys((*_PII_BUCKETS, "other"), 0)
     turns_with_pii = 0
     aggregate_types: set[str] = set()
     examples: list[dict[str, Any]] = []
@@ -288,7 +290,9 @@ def _turn_domain(
     return str(value) if value else None
 
 
-def _section_compliance(turns: list[dict[str, Any]], prospect_inputs: dict[str, Any]) -> dict[str, Any]:
+def _section_compliance(
+    turns: list[dict[str, Any]], prospect_inputs: dict[str, Any]
+) -> dict[str, Any]:
     examples: list[dict[str, Any]] = []
     reason_codes: set[str] = set()
     turns_with_compliance = 0
@@ -354,7 +358,11 @@ def _section_compliance(turns: list[dict[str, Any]], prospect_inputs: dict[str, 
                         "pii_detection_method": "baseline_regex_only",
                         "pii_types": list(summary.get("pii_types") or []),
                         "escalation_detected": bool(summary.get("escalation_detected")),
-                        "outcome": summary.get("outcome") if summary.get("outcome") in _OUTCOME_KEYS else None,
+                        "outcome": (
+                            summary.get("outcome")
+                            if summary.get("outcome") in _OUTCOME_KEYS
+                            else None
+                        ),
                     },
                     "engine_outcome": summary.get("outcome"),
                     "would_have_blocked_in_enforce": would_block,
@@ -446,7 +454,7 @@ def _section_token_savings(
       Tier 3     saved = L            # enforce mode would not call the LLM at all
       tokens_saved = sum of per-turn saved across observed turns
     """
-    tier_counts = {tier: 0 for tier in _TIERS}
+    tier_counts = dict.fromkeys(_TIERS, 0)
     blocked = 0
     regulated_turns = 0
 
@@ -546,9 +554,9 @@ def _section_envelope_sample(turns: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def _section_escalation(turns: list[dict[str, Any]]) -> dict[str, Any]:
-    by_tier = {tier: 0 for tier in _TIERS}
-    by_outcome = {key: 0 for key in _OUTCOME_KEYS}
-    by_risk = {band: 0 for band in _RISK_BANDS}
+    by_tier = dict.fromkeys(_TIERS, 0)
+    by_outcome = dict.fromkeys(_OUTCOME_KEYS, 0)
+    by_risk = dict.fromkeys(_RISK_BANDS, 0)
     escalation_turns = 0
     examples: list[dict[str, Any]] = []
 
@@ -727,7 +735,7 @@ def _section_recommended_path(
     latency_section: dict[str, Any],
 ) -> dict[str, Any]:
     total = len(turns)
-    tier_counts = {tier: 0 for tier in _TIERS}
+    tier_counts = dict.fromkeys(_TIERS, 0)
     turns_with_pii = 0
     escalation_turns = 0
     for turn in turns:
@@ -1112,7 +1120,7 @@ def _load_config(path: str | None) -> dict[str, Any]:
     """
     if not path:
         return {}
-    with open(path, "r", encoding="utf-8") as handle:
+    with open(path, encoding="utf-8") as handle:
         data = json.load(handle)
     if not isinstance(data, dict):
         raise ValueError("Config file must contain a JSON object at the top level.")
