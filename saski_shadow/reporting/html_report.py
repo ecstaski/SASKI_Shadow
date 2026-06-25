@@ -125,6 +125,19 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .signal p { margin: 7px 0 0; font-size: 13.5px; }
 .signal .label { color: var(--muted); font-weight: 600; font-size: 12px; }
 .empty { color: var(--muted); font-style: italic; }
+.coverage {
+  background: #eef3ff;
+  border: 1px solid #cfdcf7;
+  border-left: 4px solid #33518f;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 28px;
+  font-size: 13.5px;
+  color: #2a3a5e;
+}
+.coverage b { display: block; margin-bottom: 4px; }
+.coverage ul { margin: 6px 0 0; padding-left: 20px; }
+.coverage li { margin: 3px 0; }
 footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 30px;
   padding-top: 18px; border-top: 1px solid var(--border); }
 footer .contact { color: var(--navy); font-weight: 600; margin-bottom: 4px; }
@@ -216,6 +229,34 @@ def _cover(report: dict[str, Any]) -> str:
         f'\u00b7 {_esc(BRAND)}</div>'
         f'<div class="meta">{meta_html}</div>'
         "</div>"
+    )
+
+
+def _coverage_banner(report: dict[str, Any]) -> str:
+    """Render the run's coverage notice so empty sections are never misread.
+
+    Distinguishes "evaluated and clear" from "not evaluated this run" by naming
+    the capabilities that received no inputs. Renders nothing if the report
+    carries no coverage notice.
+    """
+    notice = report.get("coverage_notice")
+    if not isinstance(notice, dict):
+        return ""
+    inactive = notice.get("inactive_capabilities") or []
+    if not inactive:
+        return (
+            '<div class="coverage"><b>Run coverage</b>'
+            "All observable baseline capabilities were exercised in this run. "
+            "Empty sections below mean nothing was observed, not that a check was "
+            "skipped.</div>"
+        )
+    items = "".join(f"<li>{_esc(item)}</li>" for item in inactive)
+    return (
+        '<div class="coverage"><b>What was not measured in this run</b>'
+        "The following baseline capabilities produced no signal because their "
+        "inputs were not supplied. An empty or zero result for these is "
+        '"not evaluated", not "nothing found":'
+        f"<ul>{items}</ul></div>"
     )
 
 
@@ -523,6 +564,9 @@ def render_html_report(report: dict[str, Any]) -> str:
     """Return a complete, self-contained HTML document for a shadow report."""
     sections = report.get("sections", {})
     body = [_cover(report), f'<div class="banner">{_esc(OBSERVATION_BANNER)}</div>']
+    coverage_banner = _coverage_banner(report)
+    if coverage_banner:
+        body.append(coverage_banner)
     for key, renderer in _RENDERERS:
         section = sections.get(key)
         if isinstance(section, dict):

@@ -42,6 +42,24 @@
         }
       }
     },
+    "coverage_notice": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "all_capabilities_active": { "type": "boolean" },
+        "inactive_capabilities": { "type": "array", "items": { "type": "string" } },
+        "details": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "post_llm_output_review": { "type": "string" },
+            "integrator_policy_rules": { "type": "string" },
+            "token_savings_inputs": { "type": "string" },
+            "distress_detection": { "type": "string" }
+          }
+        }
+      }
+    },
     "sections": {
       "type": "object",
       "required": [

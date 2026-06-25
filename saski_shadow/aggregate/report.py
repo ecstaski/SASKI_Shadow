@@ -994,6 +994,63 @@ def _section_sdk_integration_signals(
     }
 
 
+def _coverage_notice(
+    turns: list[dict[str, Any]],
+    sections: dict[str, Any],
+) -> dict[str, Any]:
+    """Name the observable capabilities that were NOT exercised in this run.
+
+    An empty or all-zero section can read as "nothing found" when the honest
+    meaning is "not measured this run because its inputs were absent". This
+    banner states, factually and for this run only, which capabilities produced
+    no signal because they were never fed the inputs they need. It makes no
+    safety claim and asserts nothing about content; it only distinguishes
+    "not evaluated" from "evaluated and clear".
+    """
+    # Output review only runs when an assistant reply is reviewed; when it does,
+    # the turn carries the review's observable keys. Their absence everywhere
+    # means no post-LLM output review happened (e.g. provider=none, or a runner
+    # that never feeds replies back through review_output).
+    review_keys = ("pii_leaked_types", "human_escalation_claimed", "policy_boundary_hits")
+    review_performed = any(
+        any(k in (turn.get("output_review") or {}) for k in review_keys) for turn in turns
+    )
+    policy_evaluated = any((turn.get("compliance_decisions") or []) for turn in turns)
+    token_basis = sections["token_savings_calculation"]["basis"]
+    pricing_supplied = token_basis == _TOKEN_BASIS_ESTIMATED
+
+    inactive: list[str] = []
+    if not review_performed:
+        inactive.append(
+            "Post-LLM output review was not performed this run. Unsafe Flow "
+            "Documentation therefore reflects no review of model output - an empty "
+            "result here means 'not evaluated', not 'no unsafe flows'. Feed each "
+            "model reply back through output review to populate it."
+        )
+    if not policy_evaluated:
+        inactive.append(
+            "No integrator policy rules were evaluated. Compliance Exposure shows "
+            "matched public laws by jurisdiction and domain only, not policy-rule "
+            "decisions."
+        )
+    if not pricing_supplied:
+        inactive.append(
+            "Token-savings inputs were not supplied, so savings figures are null. "
+            "Observed governance-tier counts are still reported."
+        )
+
+    return {
+        "all_capabilities_active": not inactive,
+        "inactive_capabilities": inactive,
+        "details": {
+            "post_llm_output_review": "performed" if review_performed else "not_performed",
+            "integrator_policy_rules": "evaluated" if policy_evaluated else "not_evaluated",
+            "token_savings_inputs": "supplied" if pricing_supplied else "not_supplied",
+            "distress_detection": "integrator_indicator_dependent",
+        },
+    }
+
+
 def aggregate_shadow_report(
     turns: list[dict[str, Any]],
     *,
@@ -1040,6 +1097,7 @@ def aggregate_shadow_report(
         "generated_at_utc": _now_utc_iso(),
         "period": period,
         "methodology": methodology,
+        "coverage_notice": _coverage_notice(turns, sections),
         "sections": sections,
     }
 

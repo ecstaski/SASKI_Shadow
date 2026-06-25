@@ -38,10 +38,12 @@ sys.path.insert(0, str(_REPO_ROOT / "tests"))
 
 from saski_shadow import (  # noqa: E402
     aggregate_shadow_report,
+    compute_output_hash,
     load_turns_jsonl,
     result_to_jsonl_turn,
 )
 from saski_shadow.analyzer import analyze_turn  # noqa: E402
+from saski_shadow.detectors.output_review import review_output  # noqa: E402
 from saski_shadow.laws import match_laws  # noqa: E402
 from saski_shadow.reporting import generate_html_report  # noqa: E402
 
@@ -195,7 +197,6 @@ def main(argv: list[str] | None = None) -> int:
                 # Preserve a multi-domain turn so the report can surface every domain.
                 if isinstance(context.get("domains"), list):
                     turn["domains"] = list(context["domains"])
-                jsonl_handle.write(json.dumps(turn) + "\n")
             except Exception as exc:  # noqa: BLE001 - record and continue, don't crash run
                 error_turns.append(index)
                 log_lines.extend([f"--- turn {index} ---", f"ERROR: {exc}", ""])
@@ -209,6 +210,24 @@ def main(argv: list[str] | None = None) -> int:
                 except Exception as exc:  # noqa: BLE001 - surface, do not crash the run
                     reply = f"<provider error: {exc}>"
             reply_is_error = bool(reply) and reply.startswith("<provider error:")
+
+            # Post-LLM output review: feed the actual model reply back through the
+            # same observable review used on inputs, so the report's unsafe-flow
+            # section reflects model behavior (PII leaked back into the output,
+            # claimed human escalation) instead of staying empty. Only run on a
+            # real reply; provider errors and no-provider runs leave it untouched.
+            if reply is not None and not reply_is_error:
+                review = review_output(reply, input_pii_types=list(result.pii_types or []))
+                turn["output_review"] = {
+                    "pii_leaked_types": review.pii_leaked_types,
+                    "human_escalation_claimed": review.human_escalation_claimed,
+                    "policy_boundary_hits": review.policy_boundary_hits,
+                    "findings": review.findings,
+                }
+                # Record the real reply hash as evidence for the reviewed output.
+                turn["output_hash"] = compute_output_hash(reply)
+
+            jsonl_handle.write(json.dumps(turn) + "\n")
 
             ctx_domains = context.get("domains")
             domain_display = ctx_domains or summary.get("domain")
