@@ -43,14 +43,18 @@ ESCALATION_DISCLAIMER = (
     "not clinical crisis detection."
 )
 TOKEN_SAVINGS_DISCLAIMER = (
-    "Estimate only. Computed from integrator-supplied token-model and pricing "
-    "inputs using transparent arithmetic (observed tier counts x integrator "
-    "per-turn token figures x integrator unit price). It embeds no proprietary "
-    "SASKI prompt-assembly constants or hidden savings assumptions. Every output "
-    "is null unless the inputs it depends on are supplied. Token savings are "
-    "estimated from would_have_blocked signals observed in shadow mode. No LLM "
-    "egress was suppressed during this session. Actual savings depend on "
-    "production traffic patterns and licensed SDK configuration."
+    "Estimate only. Computed by transparent arithmetic from two "
+    "integrator-supplied inputs (legacy_system_prompt_tokens and "
+    "lean_product_prompt_tokens) applied to the governance-tier counts observed "
+    "in shadow mode. It embeds no proprietary SASKI prompt-assembly logic beyond "
+    "two documented, observable defaults: a regulated-mode safety-envelope floor "
+    "(applied on governed turns for child, patient, and therapist modes) and a "
+    "fixed warning append. Tier 3 (escalation) turns are counted as the full "
+    "legacy cost avoided, because in enforce mode the LLM call would not be made. "
+    "No LLM egress was suppressed during this session - shadow observed, it did "
+    "not act. Dollar savings are never computed here; apply your own input cost "
+    "per token: dollar_savings = tokens_saved x (your cost per token). Every "
+    "computed output is null unless both required inputs are supplied."
 )
 
 # Honest scope statements surfaced inside detection-bearing sections so a
@@ -71,6 +75,19 @@ BASELINE_ONLY_CAVEAT = (
 # Section 3 basis labels: makes it explicit whether numbers were calculated.
 _TOKEN_BASIS_ESTIMATED = "estimated_from_integrator_inputs"
 _TOKEN_BASIS_INSUFFICIENT = "insufficient_inputs"
+
+# Token-savings model defaults. These are documented, observable defaults (not
+# proprietary SASKI internals): governed turns in a regulated mode carry a small
+# safety-envelope floor on top of the lean product prompt, and a warning turn
+# appends a fixed number of tokens. Integrators may override both via
+# prospect_inputs; absent an override the defaults below apply.
+_REGULATED_MODES = ("child", "patient", "therapist")
+_REGULATED_MODE_FLOOR_DEFAULT = 85.0
+_WARNING_APPEND_DEFAULT = 50.0
+_DOLLAR_SAVINGS_NOTE = (
+    "Dollar savings = tokens_saved x (your input cost per token). "
+    "This report intentionally does not compute a dollar figure."
+)
 
 _MAX_EXAMPLES = 10
 _PII_BUCKETS = (
@@ -405,76 +422,73 @@ def _section_token_savings(
     turns: list[dict[str, Any]],
     prospect_inputs: dict[str, Any],
 ) -> dict[str, Any]:
-    """Transparent, integrator-input-driven token-savings estimate.
+    """Transparent, two-input token-savings estimate.
 
-    No proprietary constants. The integrator supplies a per-turn token model
-    and pricing/volume figures; this function only counts observed turns by
-    governance tier and applies visible arithmetic. Any output whose required
-    inputs are missing stays ``None``.
+    The integrator supplies just two figures; everything else is observed from
+    the shadow run or comes from two documented, observable defaults. No
+    proprietary SASKI constants and no dollar arithmetic. Every computed output
+    stays ``None`` unless both required inputs are supplied.
 
-    Token model (all per LLM turn, integrator-supplied):
-      - ``legacy_system_tokens_per_turn`` (L): ungoverned baseline cost.
-      - ``governed_system_tokens_per_turn`` (G): governed cost on a clean turn.
-      - ``warning_append_tokens`` (W): extra tokens added on a warning turn
-        (defaults to 0 when the core model is supplied).
-      - ``regulated_floor_tokens`` (R): governed cost on an escalation turn
-        (defaults to G when not supplied).
+    Integrator inputs (prospect_inputs):
+      - ``legacy_system_prompt_tokens`` (L): the integrator's current ungoverned
+        system-prompt cost per LLM turn.
+      - ``lean_product_prompt_tokens`` (P): the governed lean product-prompt cost
+        per LLM turn.
+      Optional advanced overrides:
+      - ``regulated_mode_floor_tokens`` (default 85): safety-envelope floor added
+        to P on governed turns whose mode is child/patient/therapist.
+      - ``warning_append_tokens`` (default 50): tokens appended on a Tier 2 turn.
 
-    Arithmetic:
-      governed_total = clean*G + warning*(G+W) + escalation*R
-      legacy_total   = total_turns * L
-      saved_total    = max(0, legacy_total - governed_total)   # clamp once
-      per_session    = (saved_total / total_turns) * avg_llm_turns_per_session
-      monthly        = per_session * monthly_sessions
-      annual_usd     = monthly * 12 * input_price_per_1m_tokens_usd / 1_000_000
+    Per-turn arithmetic (mode-aware):
+      floor      = regulated_mode_floor_tokens if turn mode is regulated else 0
+      Tier 1     saved = max(0, L - (P + floor))
+      Tier 2     saved = max(0, L - (P + floor + warning_append))
+      Tier 3     saved = L            # enforce mode would not call the LLM at all
+      tokens_saved = sum of per-turn saved across observed turns
     """
     tier_counts = {tier: 0 for tier in _TIERS}
     blocked = 0
+    regulated_turns = 0
+
+    legacy = _num(prospect_inputs.get("legacy_system_prompt_tokens"))
+    lean = _num(prospect_inputs.get("lean_product_prompt_tokens"))
+
+    floor_override = _num(prospect_inputs.get("regulated_mode_floor_tokens"))
+    warn_override = _num(prospect_inputs.get("warning_append_tokens"))
+    regulated_floor = (
+        floor_override if floor_override is not None else _REGULATED_MODE_FLOOR_DEFAULT
+    )
+    warning_append = (
+        warn_override if warn_override is not None else _WARNING_APPEND_DEFAULT
+    )
+
+    total = len(turns)
+    can_estimate = legacy is not None and lean is not None and total > 0
+
+    tokens_saved: float | None = 0.0 if can_estimate else None
+    tier_saved = {"tier_clean": 0.0, "tier_warning": 0.0, "tier_escalation": 0.0}
+
     for turn in turns:
-        tier_counts[_governance_tier(turn)] += 1
+        tier = _governance_tier(turn)
+        tier_counts[tier] += 1
         summary = _engine_summary(turn)
+        is_regulated = summary.get("mode") in _REGULATED_MODES
+        if is_regulated:
+            regulated_turns += 1
         if summary.get("would_block") or summary.get("outcome") == PublicOutcome.BLOCK.value:
             blocked += 1
 
-    total = len(turns)
-
-    legacy_per_turn = _num(prospect_inputs.get("legacy_system_tokens_per_turn"))
-    governed_per_turn = _num(prospect_inputs.get("governed_system_tokens_per_turn"))
-    turns_per_session = _num(prospect_inputs.get("avg_llm_turns_per_session"))
-    monthly_sessions = _num(prospect_inputs.get("monthly_sessions"))
-    input_price = _num(prospect_inputs.get("input_price_per_1m_tokens_usd"))
-
-    # The core token model needs both the legacy and governed per-turn figures
-    # plus at least one observed turn. Otherwise we report nothing computed.
-    model_supplied = legacy_per_turn is not None and governed_per_turn is not None
-    can_estimate = model_supplied and total > 0
-
-    warning_append = None
-    regulated_floor = None
-    tokens_saved_per_session = None
-    monthly_tokens_saved = None
-    annual_usd_saved = None
-
-    if can_estimate:
-        warning_append = _num(prospect_inputs.get("warning_append_tokens")) or 0.0
-        floor_input = _num(prospect_inputs.get("regulated_floor_tokens"))
-        regulated_floor = floor_input if floor_input is not None else governed_per_turn
-
-        governed_total = (
-            tier_counts["tier_clean"] * governed_per_turn
-            + tier_counts["tier_warning"] * (governed_per_turn + warning_append)
-            + tier_counts["tier_escalation"] * regulated_floor
-        )
-        legacy_total = total * legacy_per_turn
-        saved_total = max(0.0, legacy_total - governed_total)
-        saved_per_turn = saved_total / total
-
-        if turns_per_session is not None:
-            tokens_saved_per_session = saved_per_turn * turns_per_session
-            if monthly_sessions is not None:
-                monthly_tokens_saved = tokens_saved_per_session * monthly_sessions
-                if input_price is not None:
-                    annual_usd_saved = monthly_tokens_saved * 12.0 * input_price / 1_000_000.0
+        if can_estimate:
+            floor = regulated_floor if is_regulated else 0.0
+            tier1_governed = lean + floor
+            if tier == "tier_warning":
+                saved = max(0.0, legacy - (tier1_governed + warning_append))
+            elif tier == "tier_escalation":
+                saved = legacy  # full legacy cost avoided: LLM not called in enforce mode
+            else:  # tier_clean
+                saved = max(0.0, legacy - tier1_governed)
+            tier_saved[tier] += saved
+            tokens_saved += saved
 
     basis = _TOKEN_BASIS_ESTIMATED if can_estimate else _TOKEN_BASIS_INSUFFICIENT
 
@@ -482,33 +496,34 @@ def _section_token_savings(
         "section": "token_savings_calculation",
         "basis": basis,
         "disclaimer": TOKEN_SAVINGS_DISCLAIMER,
+        "dollar_savings_note": _DOLLAR_SAVINGS_NOTE,
         "upgrade_path": UPGRADE_MESSAGE,
         "prospect_inputs": {
-            "avg_tokens_per_session_legacy_system": _num(
-                prospect_inputs.get("avg_tokens_per_session_legacy_system")
-            ),
-            "avg_llm_turns_per_session": turns_per_session,
-            "monthly_sessions": monthly_sessions,
-            "input_price_per_1m_tokens_usd": input_price,
+            "legacy_system_prompt_tokens": legacy,
+            "lean_product_prompt_tokens": lean,
         },
         "measured_from_shadow": {
             "total_turns": total,
             "tier_clean_turns": tier_counts["tier_clean"],
             "tier_warning_turns": tier_counts["tier_warning"],
             "tier_escalation_turns": tier_counts["tier_escalation"],
+            "regulated_mode_turns": regulated_turns,
             "would_have_blocked_turns": blocked,
             "shadow_mode_note": "enforcement not applied; counts reflect would_block signals only",
         },
         "token_model": {
-            "legacy_system_tokens_per_turn": legacy_per_turn if can_estimate else None,
-            "governed_system_tokens_per_turn": governed_per_turn if can_estimate else None,
+            "regulated_modes": list(_REGULATED_MODES),
+            "regulated_mode_floor_tokens": regulated_floor,
             "warning_append_tokens": warning_append,
-            "regulated_floor_tokens": regulated_floor,
+            "tier3_llm_tokens": 0,
         },
         "savings": {
-            "tokens_saved_per_session_estimate": tokens_saved_per_session,
-            "monthly_tokens_saved_estimate": monthly_tokens_saved,
-            "annual_usd_saved_estimate": annual_usd_saved,
+            "tokens_saved_estimate": tokens_saved,
+            "tier_clean_tokens_saved": tier_saved["tier_clean"] if can_estimate else None,
+            "tier_warning_tokens_saved": tier_saved["tier_warning"] if can_estimate else None,
+            "tier_escalation_tokens_saved": (
+                tier_saved["tier_escalation"] if can_estimate else None
+            ),
         },
     }
 

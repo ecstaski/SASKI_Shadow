@@ -42,28 +42,16 @@ from saski_shadow import (  # noqa: E402
     result_to_jsonl_turn,
 )
 from saski_shadow.analyzer import analyze_turn  # noqa: E402
+from saski_shadow.laws import match_laws  # noqa: E402
+from saski_shadow.reporting import generate_html_report  # noqa: E402
 
-
-def _resolve_outdir(
-    cli_outdir: str | None,
-    repo_root: pathlib.Path,
-) -> tuple[str, str]:
-    """Return (outdir_path, source_label).
-
-    Precedence: CLI --outdir flag > saski_shadow_config.json output_dir > default.
-    """
-    if cli_outdir is not None:
-        return cli_outdir, "cli_flag"
-    config_path = repo_root / "saski_shadow_config.json"
-    if config_path.exists():
-        try:
-            cfg = json.loads(config_path.read_text(encoding="utf-8"))
-            output_dir = cfg.get("output_dir")
-            if isinstance(output_dir, str) and output_dir:
-                return output_dir, "config_file"
-        except (json.JSONDecodeError, OSError):
-            pass
-    return str(repo_root / "outputs"), "default"
+# Shared with generate_report.py; re-exported here so existing callers/tests that
+# import ``scripts.run_session._resolve_outdir`` keep working.
+from scripts._session_common import (  # noqa: E402
+    _build_internal_findings,
+    _load_pricing,
+    _resolve_outdir,
+)
 
 
 def _load_session(path: str | None) -> list[dict]:
@@ -78,13 +66,21 @@ def _load_session(path: str | None) -> list[dict]:
 
 
 def _send_to_provider(provider: str, prompt: str) -> str:
-    """Send the redacted prompt to a live provider; return the reply text."""
+    """Send the redacted prompt to a live provider; return the reply text.
+
+    Model selection: each provider reads an optional environment variable
+    (SASKI_ANTHROPIC_MODEL / SASKI_OPENAI_MODEL) and falls back to a
+    currently-valid default below. To use a different model for a single run,
+    prefix the command, e.g.::
+
+        SASKI_ANTHROPIC_MODEL=claude-sonnet-4-6 python3 scripts/run_session.py ...
+    """
     if provider == "anthropic":
         import anthropic
 
         client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
         resp = client.messages.create(
-            model=os.environ.get("SASKI_ANTHROPIC_MODEL", "claude-3-5-haiku-latest"),
+            model=os.environ.get("SASKI_ANTHROPIC_MODEL", "claude-haiku-4-5"),
             max_tokens=256,
             messages=[{"role": "user", "content": prompt}],
         )
@@ -123,7 +119,26 @@ def main(argv: list[str] | None = None) -> int:
             "Default: outputs/ (or config file value)."
         ),
     )
+    parser.add_argument(
+        "--format",
+        choices=["json", "html"],
+        default="json",
+        help=(
+            "Customer report format. 'json' writes report.json (default); "
+            "'html' writes report.html instead."
+        ),
+    )
+    parser.add_argument(
+        "--pricing",
+        default=None,
+        help=(
+            "Optional path to a pricing JSON (e.g. pricing.json) supplying "
+            "token-savings inputs (legacy_system_prompt_tokens, "
+            "lean_product_prompt_tokens)."
+        ),
+    )
     args = parser.parse_args(argv)
+    prospect_inputs = _load_pricing(args.pricing)
 
     # Load .env so provider keys are available when run as a script.
     try:
@@ -150,7 +165,8 @@ def main(argv: list[str] | None = None) -> int:
     run_dir.mkdir(parents=True, exist_ok=True)
     jsonl_path = run_dir / "turns.jsonl"
     log_path = run_dir / "session.log"
-    report_path = run_dir / "report.json"
+    report_path = run_dir / ("report.html" if args.format == "html" else "report.json")
+    internal_path = run_dir / "internal_findings.log"
 
     session_id = f"runner_{run_id}"
     log_lines: list[str] = [
@@ -159,6 +175,9 @@ def main(argv: list[str] | None = None) -> int:
         f"# turns: {len(session)}",
         "",
     ]
+    # Per-turn records feed internal_findings.log only; never session.log/report.
+    records: list[dict] = []
+    error_turns: list[int] = []
 
     with open(jsonl_path, "w", encoding="utf-8") as jsonl_handle:
         for index, raw in enumerate(session):
@@ -168,14 +187,19 @@ def main(argv: list[str] | None = None) -> int:
                 context.setdefault("extra_distress_indicators", raw["extra_distress_indicators"])
             mode = context.get("mode")
 
-            result = analyze_turn(message, session_context=context, mode=mode)
-            turn = result_to_jsonl_turn(
-                result, session_id=session_id, turn_index=index, provider_id=args.provider
-            )
-            # Preserve a multi-domain turn so the report can surface every domain.
-            if isinstance(context.get("domains"), list):
-                turn["domains"] = list(context["domains"])
-            jsonl_handle.write(json.dumps(turn) + "\n")
+            try:
+                result = analyze_turn(message, session_context=context, mode=mode)
+                turn = result_to_jsonl_turn(
+                    result, session_id=session_id, turn_index=index, provider_id=args.provider
+                )
+                # Preserve a multi-domain turn so the report can surface every domain.
+                if isinstance(context.get("domains"), list):
+                    turn["domains"] = list(context["domains"])
+                jsonl_handle.write(json.dumps(turn) + "\n")
+            except Exception as exc:  # noqa: BLE001 - record and continue, don't crash run
+                error_turns.append(index)
+                log_lines.extend([f"--- turn {index} ---", f"ERROR: {exc}", ""])
+                continue
 
             summary = result.metadata["engine_summary"]
             reply = None
@@ -184,6 +208,30 @@ def main(argv: list[str] | None = None) -> int:
                     reply = _send_to_provider(args.provider, result.message_for_llm or "")
                 except Exception as exc:  # noqa: BLE001 - surface, do not crash the run
                     reply = f"<provider error: {exc}>"
+            reply_is_error = bool(reply) and reply.startswith("<provider error:")
+
+            ctx_domains = context.get("domains")
+            domain_display = ctx_domains or summary.get("domain")
+            domain_arg = ctx_domains if isinstance(ctx_domains, list) else summary.get("domain")
+            matched = match_laws(summary.get("user_jurisdiction"), domain_arg)
+            records.append(
+                {
+                    "index": index,
+                    "mode": summary.get("mode"),
+                    "jurisdiction": summary.get("user_jurisdiction"),
+                    "domain_display": domain_display,
+                    "message": message,
+                    "redacted": result.message_for_llm,
+                    "reply": reply,
+                    "reply_is_error": reply_is_error,
+                    "pii": bool(summary.get("pii_detected")),
+                    "pii_span_count": len(summary.get("pii_types") or []),
+                    "escalation": bool(summary.get("escalation_detected")),
+                    "outcome": summary.get("outcome"),
+                    "risk_band": summary.get("risk_band"),
+                    "matched_law_ids": [law["law_id"] for law in matched],
+                }
+            )
 
             log_lines.extend(
                 [
@@ -204,8 +252,11 @@ def main(argv: list[str] | None = None) -> int:
             log_lines.append("")
 
     turns = load_turns_jsonl(str(jsonl_path))
-    report = aggregate_shadow_report(turns)
-    report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    report = aggregate_shadow_report(turns, prospect_inputs=prospect_inputs)
+    if args.format == "html":
+        generate_html_report(report, str(report_path))
+    else:
+        report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
 
     sis = report["sections"]["sdk_integration_signals"]
     log_lines.append("=== SDK INTEGRATION SIGNALS ===")
@@ -223,6 +274,19 @@ def main(argv: list[str] | None = None) -> int:
 
     log_path.write_text("\n".join(log_lines), encoding="utf-8")
 
+    # internal_findings.log — dev-only, written separately so none of its content
+    # ever lands in session.log or report.json above.
+    internal_text = _build_internal_findings(
+        run_id=run_id,
+        provider=args.provider,
+        generated_utc=_dt.datetime.now(_dt.timezone.utc).isoformat(),
+        total_turns=len(session),
+        records=records,
+        error_turns=error_turns,
+        sis_signals=sis["signals"],
+    )
+    internal_path.write_text(internal_text, encoding="utf-8")
+
     compliance = report["sections"]["compliance_exposure_examples"]
     pii = report["sections"]["pii_phi_detection_summary"]
     escalation = report["sections"]["escalation_signal_count"]
@@ -235,9 +299,11 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  unique laws matched:    {len(law_summary['unique_law_ids'])}")
     print(f"  future-effective laws:  {law_summary['future_effective_count']}")
     print(f"  provider:               {args.provider}")
+    report_label = "report.html:" if args.format == "html" else "report.json:"
     print(f"  turns.jsonl:            {jsonl_path}")
     print(f"  session.log:            {log_path}")
-    print(f"  report.json:            {report_path}")
+    print(f"  {report_label:<22}  {report_path}")
+    print(f"  internal_findings.log:  {internal_path}  (INTERNAL ONLY)")
     return 0
 
 

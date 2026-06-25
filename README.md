@@ -37,7 +37,7 @@ Report sections and what they honestly promise:
 |---------|---------------------------|
 | PII and PHI Detection | Counts and redacts obvious US identifier patterns — SSN, phone, email, credit card, date of birth, insurance ID, address, IP. Not HIPAA Safe Harbor complete. |
 | Compliance Exposure | Flags turns that match your own policy rules, and names public US AI laws by jurisdiction and domain from a transparent starter set (see Law Coverage). No built-in statute *enforcement*. |
-| Token Savings | Arithmetic estimate from your actual tier counts and integrator-supplied pricing inputs. |
+| Token Savings | Arithmetic estimate of tokens saved from your observed tier counts and two integrator-supplied token inputs. Reports tokens only — never a dollar figure. |
 | Cryptographic Evidence | Full structural accuracy — deterministic hashes, artifact chain, schema-valid envelope. This is the strongest section. |
 | Escalation Signals | Counts conservative public distress phrase matches. Not clinical crisis detection. |
 | Unsafe Flow Documentation | Documents observable mismatches between detection signals and actual LLM behavior. |
@@ -338,44 +338,52 @@ are provided, and the section always reports its
 `basis` (`estimated_from_integrator_inputs` or 
 `insufficient_inputs`).
 
-Supply inputs under `prospect_inputs` in the 
-`--config` JSON (or via the `prospect_inputs` 
-argument to `aggregate_shadow_report`):
+You supply just **two** numbers. Pass them under 
+`prospect_inputs` (via the `prospect_inputs` argument 
+to `aggregate_shadow_report`, the `--config` JSON, or 
+a `--pricing pricing.json` file for the session 
+scripts — see `pricing.example.json`):
 
 ```json
 {
   "prospect_inputs": {
-    "legacy_system_tokens_per_turn": 400,
-    "governed_system_tokens_per_turn": 120,
-    "warning_append_tokens": 30,
-    "regulated_floor_tokens": 200,
-    "avg_llm_turns_per_session": 8,
-    "monthly_sessions": 100000,
-    "input_price_per_1m_tokens_usd": 2.5
+    "legacy_system_prompt_tokens": 450,
+    "lean_product_prompt_tokens": 103
   }
 }
 ```
 
-The arithmetic, per LLM turn, is:
+- `legacy_system_prompt_tokens` (L) — your current 
+  ungoverned system-prompt cost per LLM turn.
+- `lean_product_prompt_tokens` (P) — the governed 
+  lean product-prompt cost per turn.
+
+The arithmetic is applied **per turn**, keyed on the 
+governance tier observed for that turn and whether 
+the turn's mode is regulated (`child`, `patient`, 
+`therapist`):
 
 ```text
-governed_total = clean*G + warning*(G + W) + escalation*R
-legacy_total   = total_turns * L
-saved_total    = max(0, legacy_total - governed_total)
-per_session    = (saved_total / total_turns) * avg_llm_turns_per_session
-monthly        = per_session * monthly_sessions
-annual_usd     = monthly * 12 * input_price_per_1m_tokens_usd / 1_000_000
+floor   = regulated_mode_floor_tokens if mode is regulated else 0
+Tier 1  saved = max(0, L - (P + floor))
+Tier 2  saved = max(0, L - (P + floor + warning_append))
+Tier 3  saved = L            # enforce mode would not call the LLM at all
+tokens_saved  = sum of per-turn saved across observed turns
 ```
 
-where `L`/`G`/`W`/`R` are your 
-`legacy_system_tokens_per_turn`, 
-`governed_system_tokens_per_turn`, 
-`warning_append_tokens` (defaults to 0), and 
-`regulated_floor_tokens` (defaults to `G`). If you 
-omit `legacy_system_tokens_per_turn` or 
-`governed_system_tokens_per_turn`, the section 
-returns all-`null` savings with 
+Two optional advanced overrides are exposed with 
+documented, observable defaults: 
+`regulated_mode_floor_tokens` (default **85**) and 
+`warning_append_tokens` (default **50**). If you omit 
+`legacy_system_prompt_tokens` or 
+`lean_product_prompt_tokens`, the section returns 
+all-`null` savings with 
 `basis = "insufficient_inputs"`.
+
+**No dollar figure is ever computed.** The report 
+gives you `tokens_saved` only; multiply by your own 
+input cost per token: 
+`dollar_savings = tokens_saved × (your cost per token)`.
 
 ---
 

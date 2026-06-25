@@ -28,3 +28,9 @@ saski_shadow_config.json
 
 # Session runner output (turn stores, logs, generated reports)
 outputs/
+# Internal-only findings file (LLM replies + dev notes). Already under outputs/,
+# but listed explicitly so it is never committed even if outdir changes.
+internal_findings.log
+# Integrator-supplied token-savings pricing inputs. Use pricing.example.json as
+# a template; the real pricing.json stays local and is never committed.
+pricing.json

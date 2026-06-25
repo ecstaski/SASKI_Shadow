@@ -284,15 +284,14 @@
           "enum": ["estimated_from_integrator_inputs", "insufficient_inputs"]
         },
         "disclaimer": { "type": "string" },
+        "dollar_savings_note": { "type": "string" },
         "upgrade_path": { "type": "string" },
         "prospect_inputs": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "avg_tokens_per_session_legacy_system": { "type": ["number", "null"] },
-            "avg_llm_turns_per_session": { "type": ["number", "null"] },
-            "monthly_sessions": { "type": ["number", "null"] },
-            "input_price_per_1m_tokens_usd": { "type": ["number", "null"] }
+            "legacy_system_prompt_tokens": { "type": ["number", "null"] },
+            "lean_product_prompt_tokens": { "type": ["number", "null"] }
           }
         },
         "measured_from_shadow": {
@@ -303,6 +302,7 @@
             "tier_clean_turns": { "type": "integer", "minimum": 0 },
             "tier_warning_turns": { "type": "integer", "minimum": 0 },
             "tier_escalation_turns": { "type": "integer", "minimum": 0 },
+            "regulated_mode_turns": { "type": "integer", "minimum": 0 },
             "would_have_blocked_turns": { "type": "integer", "minimum": 0 },
             "shadow_mode_note": { "type": "string" }
           }
@@ -311,19 +311,20 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "legacy_system_tokens_per_turn": { "type": ["number", "null"] },
-            "governed_system_tokens_per_turn": { "type": ["number", "null"] },
+            "regulated_modes": { "type": "array", "items": { "type": "string" } },
+            "regulated_mode_floor_tokens": { "type": ["number", "null"] },
             "warning_append_tokens": { "type": ["number", "null"] },
-            "regulated_floor_tokens": { "type": ["number", "null"] }
+            "tier3_llm_tokens": { "type": ["number", "null"] }
           }
         },
         "savings": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "tokens_saved_per_session_estimate": { "type": ["number", "null"] },
-            "monthly_tokens_saved_estimate": { "type": ["number", "null"] },
-            "annual_usd_saved_estimate": { "type": ["number", "null"] }
+            "tokens_saved_estimate": { "type": ["number", "null"] },
+            "tier_clean_tokens_saved": { "type": ["number", "null"] },
+            "tier_warning_tokens_saved": { "type": ["number", "null"] },
+            "tier_escalation_tokens_saved": { "type": ["number", "null"] }
           }
         }
       }

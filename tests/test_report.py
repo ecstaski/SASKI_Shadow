@@ -124,76 +124,106 @@ def test_detected_pii_types_map_to_named_buckets_not_other():
 
 
 def test_token_savings_nulls_when_inputs_missing():
-    # No token model / pricing supplied -> nothing is invented.
+    # No integrator inputs supplied -> nothing is invented.
     section = aggregate_shadow_report(_sample_turns())["sections"]["token_savings_calculation"]
     assert section["basis"] == "insufficient_inputs"
     assert section["savings"] == {
-        "tokens_saved_per_session_estimate": None,
-        "monthly_tokens_saved_estimate": None,
-        "annual_usd_saved_estimate": None,
+        "tokens_saved_estimate": None,
+        "tier_clean_tokens_saved": None,
+        "tier_warning_tokens_saved": None,
+        "tier_escalation_tokens_saved": None,
     }
-    assert section["token_model"]["legacy_system_tokens_per_turn"] is None
+    assert section["prospect_inputs"]["legacy_system_prompt_tokens"] is None
+    assert section["prospect_inputs"]["lean_product_prompt_tokens"] is None
     # Observed counts are still reported even without a model.
     assert section["measured_from_shadow"]["total_turns"] == 4
     assert section["measured_from_shadow"]["would_have_blocked_turns"] == 1
 
 
 def test_token_savings_calculates_when_inputs_supplied():
-    # 4 turns: 1 clean, 1 warning, 2 escalation (1 of which blocked).
+    # 4 turns (no regulated mode): 1 clean, 1 warning, 2 escalation.
     prospect_inputs = {
-        "legacy_system_tokens_per_turn": 400,
-        "governed_system_tokens_per_turn": 120,
-        "warning_append_tokens": 30,
-        "regulated_floor_tokens": 200,
-        "avg_llm_turns_per_session": 8,
-        "monthly_sessions": 100000,
-        "input_price_per_1m_tokens_usd": 2.5,
+        "legacy_system_prompt_tokens": 450,
+        "lean_product_prompt_tokens": 103,
     }
     section = aggregate_shadow_report(
         _sample_turns(), prospect_inputs=prospect_inputs
     )["sections"]["token_savings_calculation"]
 
     assert section["basis"] == "estimated_from_integrator_inputs"
-    # governed_total = 1*120 + 1*150 + 2*200 = 670; legacy_total = 4*400 = 1600
-    # saved_total = 930; per_turn = 232.5; per_session = 232.5 * 8 = 1860
+    # clean: 450-103=347; warning: 450-(103+50)=297; escalation: 450 each (LLM not called).
     savings = section["savings"]
-    assert savings["tokens_saved_per_session_estimate"] == 1860.0
-    assert savings["monthly_tokens_saved_estimate"] == 186_000_000.0
-    assert savings["annual_usd_saved_estimate"] == 5580.0
+    assert savings["tier_clean_tokens_saved"] == 347.0
+    assert savings["tier_warning_tokens_saved"] == 297.0
+    assert savings["tier_escalation_tokens_saved"] == 900.0
+    assert savings["tokens_saved_estimate"] == 1544.0
     assert section["token_model"] == {
-        "legacy_system_tokens_per_turn": 400.0,
-        "governed_system_tokens_per_turn": 120.0,
-        "warning_append_tokens": 30.0,
-        "regulated_floor_tokens": 200.0,
+        "regulated_modes": ["child", "patient", "therapist"],
+        "regulated_mode_floor_tokens": 85.0,
+        "warning_append_tokens": 50.0,
+        "tier3_llm_tokens": 0,
     }
+    assert section["prospect_inputs"] == {
+        "legacy_system_prompt_tokens": 450.0,
+        "lean_product_prompt_tokens": 103.0,
+    }
+    # No dollar figure is ever computed.
+    assert "dollar_savings_note" in section
+    assert "tokens_saved" in section["dollar_savings_note"]
 
 
-def test_token_savings_defaults_warning_zero_and_floor_to_governed():
-    prospect_inputs = {
-        "legacy_system_tokens_per_turn": 400,
-        "governed_system_tokens_per_turn": 120,
-    }
+def test_token_savings_applies_regulated_mode_floor_per_turn():
+    # Two clean turns in patient mode -> 85-token floor added on top of lean.
+    turns = [
+        _turn(0, "sess_reg", outcome="allow", tier="tier_clean"),
+        _turn(1, "sess_reg", outcome="allow", tier="tier_clean"),
+    ]
+    for turn in turns:
+        turn["engine_summary"]["mode"] = "patient"
     section = aggregate_shadow_report(
-        _sample_turns(), prospect_inputs=prospect_inputs
+        turns,
+        prospect_inputs={
+            "legacy_system_prompt_tokens": 450,
+            "lean_product_prompt_tokens": 103,
+        },
     )["sections"]["token_savings_calculation"]
-    assert section["basis"] == "estimated_from_integrator_inputs"
+    # each clean regulated turn: 450 - (103 + 85) = 262
+    assert section["savings"]["tier_clean_tokens_saved"] == 524.0
+    assert section["savings"]["tokens_saved_estimate"] == 524.0
+    assert section["measured_from_shadow"]["regulated_mode_turns"] == 2
+
+
+def test_token_savings_floor_and_warning_overrides_honored():
+    turns = [_turn(0, "s", outcome="allow", tier="tier_clean")]
+    turns[0]["engine_summary"]["mode"] = "child"
+    section = aggregate_shadow_report(
+        turns,
+        prospect_inputs={
+            "legacy_system_prompt_tokens": 1000,
+            "lean_product_prompt_tokens": 100,
+            "regulated_mode_floor_tokens": 0,
+            "warning_append_tokens": 0,
+        },
+    )["sections"]["token_savings_calculation"]
+    assert section["token_model"]["regulated_mode_floor_tokens"] == 0.0
     assert section["token_model"]["warning_append_tokens"] == 0.0
-    assert section["token_model"]["regulated_floor_tokens"] == 120.0
-    # Without avg_llm_turns_per_session, per-session savings cannot be derived.
-    assert section["savings"]["tokens_saved_per_session_estimate"] is None
+    # Floor override of 0 -> regulated turn behaves like a plain clean turn.
+    assert section["savings"]["tier_clean_tokens_saved"] == 900.0
 
 
 def test_token_savings_never_negative():
-    # Governed model costlier than legacy -> savings clamp to 0, not negative.
-    prospect_inputs = {
-        "legacy_system_tokens_per_turn": 100,
-        "governed_system_tokens_per_turn": 500,
-        "avg_llm_turns_per_session": 4,
-    }
+    # Lean model costlier than legacy -> Tier 1/2 clamp to 0; Tier 3 still saves.
     section = aggregate_shadow_report(
-        _sample_turns(), prospect_inputs=prospect_inputs
+        _sample_turns(),
+        prospect_inputs={
+            "legacy_system_prompt_tokens": 100,
+            "lean_product_prompt_tokens": 500,
+        },
     )["sections"]["token_savings_calculation"]
-    assert section["savings"]["tokens_saved_per_session_estimate"] == 0.0
+    assert section["savings"]["tier_clean_tokens_saved"] == 0.0
+    assert section["savings"]["tier_warning_tokens_saved"] == 0.0
+    assert section["savings"]["tier_escalation_tokens_saved"] == 200.0
+    assert section["savings"]["tokens_saved_estimate"] == 200.0
 
 
 def test_section2_names_specific_laws_on_jurisdiction_domain_match():
@@ -291,13 +321,8 @@ def test_cli_aggregate_with_config_populates_token_savings(tmp_path):
         json.dumps(
             {
                 "prospect_inputs": {
-                    "legacy_system_tokens_per_turn": 400,
-                    "governed_system_tokens_per_turn": 120,
-                    "warning_append_tokens": 30,
-                    "regulated_floor_tokens": 200,
-                    "avg_llm_turns_per_session": 8,
-                    "monthly_sessions": 100000,
-                    "input_price_per_1m_tokens_usd": 2.5,
+                    "legacy_system_prompt_tokens": 450,
+                    "lean_product_prompt_tokens": 103,
                 }
             }
         ),
@@ -319,7 +344,7 @@ def test_cli_aggregate_with_config_populates_token_savings(tmp_path):
     report = json.loads(output_path.read_text(encoding="utf-8"))
     section = report["sections"]["token_savings_calculation"]
     assert section["basis"] == "estimated_from_integrator_inputs"
-    assert section["savings"]["annual_usd_saved_estimate"] == 5580.0
+    assert section["savings"]["tokens_saved_estimate"] is not None
 
 
 # --- Task 2: future-effective law split -------------------------------------
@@ -446,11 +471,8 @@ def test_generated_report_validates_against_bundled_schema():
     report = aggregate_shadow_report(
         turns,
         prospect_inputs={
-            "legacy_system_tokens_per_turn": 400,
-            "governed_system_tokens_per_turn": 120,
-            "avg_llm_turns_per_session": 8,
-            "monthly_sessions": 1000,
-            "input_price_per_1m_tokens_usd": 2.5,
+            "legacy_system_prompt_tokens": 450,
+            "lean_product_prompt_tokens": 103,
         },
         latency_targets={"integrator_p95_target_ms": 50.0},
     )
@@ -464,9 +486,11 @@ def test_section2_disclaimer_states_metadata_keyed_matching():
     assert "integrator-supplied jurisdiction and domain metadata" in COMPLIANCE_DISCLAIMER
 
 
-def test_section3_disclaimer_states_would_have_blocked_estimate_basis():
+def test_section3_disclaimer_states_observation_only_and_no_dollars():
     section = aggregate_shadow_report(_sample_turns())["sections"]["token_savings_calculation"]
-    assert "would_have_blocked signals" in section["disclaimer"]
+    disclaimer = section["disclaimer"]
+    assert "shadow observed, it did not act" in disclaimer
+    assert "Dollar savings are never computed here" in disclaimer
 
 
 def test_section5_escalation_disclaimer_is_clean_and_unchanged():
