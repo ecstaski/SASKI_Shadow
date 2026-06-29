@@ -9,6 +9,8 @@ _STAGES = {
     "normalize_input",
     "detect_pii",
     "detect_distress",
+    "detect_adversarial",
+    "detect_clinical_intent",
     "evaluate_policy",
     "review_output",
     "decide_outcome",
@@ -27,7 +29,7 @@ def test_clean_message_allows_and_stays_clean_tier():
     assert result.metadata["detector_profile"] == "baseline-v1"
 
 
-def test_pipeline_records_all_eight_stage_timings():
+def test_pipeline_records_all_stage_timings():
     result = analyze_turn("the purple widget hums quietly")
     assert set(result.metadata["engine_summary"]["phase_timings"]) == _STAGES
 
@@ -41,7 +43,7 @@ def test_synthetic_token_message_stays_clean_tier():
 
 
 def test_distress_indicator_warns_and_does_not_block():
-    result = analyze_turn("payload synthetic-distress-token-beta payload")
+    result = analyze_turn("honestly I want to die")
     summary = result.metadata["engine_summary"]
     assert summary["escalation_detected"] is True
     assert result.action == "warn"

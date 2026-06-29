@@ -61,8 +61,10 @@ TOKEN_SAVINGS_DISCLAIMER = (
 # reader cannot mistake baseline observation for full enforcement coverage.
 DETECTION_LIMITATIONS = [
     "CSAM content detection requires an upstream classifier; this package does not detect CSAM.",
-    "Distress detection uses integrator-supplied indicators only; baseline "
-    "synthetic tokens are placeholders.",
+    "Distress detection uses a small baseline list of common crisis phrases plus "
+    "integrator-supplied indicators. This is common phrase awareness only — not "
+    "clinical crisis detection. The licensed SASKI SDK provides clinical-grade "
+    "crisis detection without requiring phrase lists.",
     "Law matching uses integrator-supplied jurisdiction and domain metadata; "
     "no content-based jurisdiction inference.",
     "future_effective laws are surfaced for awareness and are not currently enforceable.",
@@ -848,9 +850,11 @@ def _section_sdk_integration_signals(
                 "title": "Real distress detection requires licensed engine",
                 "observation": (
                     f"Shadow detected {escalation_turns} escalation signal"
-                    f"{'s' if escalation_turns != 1 else ''} using integrator-supplied "
-                    "indicators. Baseline detection cannot identify real distress language "
-                    "without integrator-supplied phrases."
+                    f"{'s' if escalation_turns != 1 else ''}. Baseline detection uses a "
+                    "small list of common crisis phrases plus integrator-supplied "
+                    "indicators. The licensed SASKI SDK provides clinical-grade crisis "
+                    "detection without phrase lists and catches indirect, contextual, and "
+                    "semantic crisis signals the baseline cannot."
                 ),
                 "sdk_recommendation": (
                     "Configure the licensed SASKI SDK with mode-appropriate crisis "

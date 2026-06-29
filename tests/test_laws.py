@@ -60,6 +60,15 @@ def test_exact_state_domain_match_names_specific_law():
 
 def test_domain_must_match_exactly():
     # CA has chatbot, healthcare, and employment laws, but no mental_health law.
+    #
+    # TODO(Gap 5 / registry resync): this assertion must be updated AFTER the
+    # registry adds the two California mental-health duplicate entries
+    # (US-CA-AB3030-HEALTH-MH and US-CA-HEALTH-ADVICE-AI-MH, domain=mental_health)
+    # and that change is resynced into starter.py. See SYNC.md "Pending Registry
+    # Changes". The registry change must happen first; do not flip this assertion
+    # before starter.py actually carries those entries, or this test will lie.
+    # After the resync, expect match_laws("US-CA", "mental_health") to return
+    # those two -MH law ids instead of [].
     assert match_laws("US-CA", "mental_health") == []
 
 

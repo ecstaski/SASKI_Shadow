@@ -46,9 +46,33 @@ def _luhn_ok(value: str) -> bool:
 # Email: simplified form of the addr-spec described in RFC 5322.
 _EMAIL = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 
+# Obfuscated email: a common evasion that replaces "@" with a bracketed or
+# parenthesized "at" (e.g. user[at]example.com, contact(at)domain.org). Only the
+# bracketed/parenthesized forms are matched -- a bare " at " is intentionally not
+# matched because it produces too many false positives on ordinary prose. The
+# domain tail accepts either literal dots or bracketed/parenthesized "dot"
+# substitution and requires at least one TLD-like segment. Reuses the email type.
+_EMAIL_OBFUSCATED = re.compile(
+    r"[A-Za-z0-9._%+\-]+"
+    r"\s*[\[(]\s*at\s*[\])]\s*"
+    r"[A-Za-z0-9\-]+"
+    r"(?:\s*(?:\.|[\[(]\s*dot\s*[\])])\s*[A-Za-z0-9\-]+)+",
+    re.IGNORECASE,
+)
+
 # IPv4: dotted-decimal notation per RFC 791, each octet 0-255.
 _IPV4 = re.compile(
     r"\b(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)\b"
+)
+
+# Obfuscated IPv4: a common evasion that replaces the dots with the literal word
+# "dot" or a bracketed "[dot]" (e.g. 192 dot 168 dot 1 dot 1). Each of the four
+# fields is still validated as a 0-255 octet, so four arbitrary numbers joined by
+# "dot" do not match unless they form a valid dotted quad. Reuses the ip type.
+_IPV4_OBFUSCATED = re.compile(
+    r"\b(?:25[0-5]|2[0-4]\d|1?\d?\d)"
+    r"(?:(?:\s+dot\s+|\s*\[dot\]\s*)(?:25[0-5]|2[0-4]\d|1?\d?\d)){3}\b",
+    re.IGNORECASE,
 )
 
 # Insurance / member identifiers: there is no single public format, so this is
@@ -71,6 +95,15 @@ _PHONE = re.compile(
     r"(?<!\d)(?:\+?1[ .\-]?)?\(?\d{3}\)?[ .\-]?\d{3}[ .\-]?\d{4}(?!\d)"
 )
 
+# International phone (non-+1): requires an explicit leading "+", a 1-3 digit
+# country code, and a reasonable run of space/dot/dash-separated digit groups
+# (e.g. +44 20 7946 0958, +61 2 9876 5432). The "+" requirement keeps this
+# conservative; +1 NANP numbers are already covered by _PHONE above. Reuses the
+# phone type. Runs before _PHONE so a full international number is matched whole.
+_PHONE_INTL = re.compile(
+    r"(?<![\w+])\+\d{1,3}(?:[ .\-]\d{1,4}){2,6}(?!\d)"
+)
+
 # Common US date formats (M/D/Y and ISO Y-M-D). The detector cannot infer that
 # a date is specifically a birth date; this is a date-shaped token baseline.
 _DATE = re.compile(
@@ -90,10 +123,13 @@ _ADDRESS = re.compile(
 # Ordered so that labeled and validated matches resolve before looser ones.
 _PATTERNS = (
     {"type": "email", "regex": _EMAIL},
+    {"type": "email", "regex": _EMAIL_OBFUSCATED},
     {"type": "ip", "regex": _IPV4},
+    {"type": "ip", "regex": _IPV4_OBFUSCATED},
     {"type": "insurance_id", "regex": _INSURANCE_ID, "group": 1},
     {"type": "credit_card", "regex": _CARD_CANDIDATE, "validator": _luhn_ok},
     {"type": "ssn", "regex": _SSN},
+    {"type": "phone", "regex": _PHONE_INTL},
     {"type": "phone", "regex": _PHONE},
     {"type": "date_of_birth", "regex": _DATE},
     {"type": "address", "regex": _ADDRESS},

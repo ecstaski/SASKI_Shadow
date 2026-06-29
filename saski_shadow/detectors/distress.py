@@ -1,13 +1,15 @@
 """Baseline distress indicator detection.
 
-This module provides a conservative public baseline distress indicator list.
-It is not clinical crisis detection and must not be used as the sole safety
-layer for any regulated deployment.
+This module provides a small baseline list of common crisis phrases. It is
+**common phrase awareness only — not clinical crisis detection**, and must not
+be used as the sole safety layer for any regulated deployment. The list catches
+only literal, direct phrasings; it cannot detect indirect, contextual, or
+semantic distress. Clinical-grade crisis detection that does not depend on a
+phrase list is provided by the licensed SASKI engine.
 
-The baseline list below uses synthetic tokens only. Real indicator content
-is supplied by integrators via ``extra_indicators`` or by the licensed
-SASKI engine. The list contains nothing proprietary and encodes no
-algorithmic thresholds or weights.
+The list contains nothing proprietary and encodes no algorithmic thresholds or
+weights — it is a plain set of well-known public crisis phrases. Integrators may
+extend it for a turn via ``extra_indicators``.
 
 Outcome behavior (baseline): a distress phrase match alone never blocks. When
 ``escalation_detected`` is True and no policy rule or PII block applies, the
@@ -20,13 +22,27 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-# Phrase list intentionally uses synthetic tokens. Real indicator content is
-# supplied by integrators via the extra_indicators parameter or by the
-# licensed SASKI engine.
+# Small baseline list of common, public, direct crisis phrases. Common phrase
+# awareness only -- not clinical crisis detection. It matches literal phrasings
+# only and will miss indirect/contextual/semantic distress. Integrators may add
+# more phrases per turn via the extra_indicators parameter; the licensed SASKI
+# engine provides clinical-grade detection without any phrase list.
 _BASELINE_INDICATORS = (
-    "synthetic-distress-token-alpha",
-    "synthetic-distress-token-beta",
-    "synthetic-distress-token-gamma",
+    "kill myself",
+    "killing myself",
+    "end my life",
+    "ending my life",
+    "want to die",
+    "wanna die",
+    "hurt myself",
+    "hurting myself",
+    "harm myself",
+    "harming myself",
+    "suicide",
+    "suicidal",
+    "take my own life",
+    "don't want to live",
+    "no reason to live",
 )
 
 

@@ -66,7 +66,10 @@ def test_distress_extra_indicators_fire_on_matching_phrases():
         extra_indicators=["want to hurt", "feel hopeless"],
     )
     assert result.escalation_detected is True
-    assert set(result.matched_indicators) == {"want to hurt", "feel hopeless"}
+    # The integrator-supplied indicators must both fire. (This message also
+    # contains the baseline phrase "hurt myself", which now legitimately matches
+    # too, so we assert the extra indicators are present rather than exclusive.)
+    assert {"want to hurt", "feel hopeless"} <= set(result.matched_indicators)
 
 
 def test_distress_word_boundary_precision_sad_does_not_fire_on_saddleback():
@@ -74,14 +77,16 @@ def test_distress_word_boundary_precision_sad_does_not_fire_on_saddleback():
     assert result.escalation_detected is False
 
 
-def test_distress_baseline_without_extra_indicators_misses_realistic_language():
-    # Baseline limitation, made explicit: only the synthetic placeholder tokens
-    # fire out of the box; realistic distress language does not match unless the
-    # integrator supplies real indicators.
-    placeholder = detect_distress("payload synthetic-distress-token-alpha here")
-    realistic = detect_distress("I feel hopeless and I want to give up")
-    assert placeholder.escalation_detected is True
-    assert realistic.escalation_detected is False
+def test_distress_baseline_catches_common_phrases_but_not_indirect_language():
+    # The baseline now ships a small list of common, direct crisis phrases, so a
+    # literal phrase from that list fires without any integrator-supplied
+    # indicators. The honest boundary is preserved: indirect/contextual distress
+    # NOT on the list still does not fire -- that requires the licensed engine or
+    # integrator-supplied phrases.
+    direct = detect_distress("I want to kill myself")
+    indirect = detect_distress("I feel like I'm fading away")
+    assert direct.escalation_detected is True
+    assert indirect.escalation_detected is False
 
 
 # --- Gap 2: domain coverage end-to-end through analyze_turn ------------------

@@ -262,18 +262,21 @@ The report will then surface laws from **both** domains for that turn.
 
 ### What `extra_distress_indicators` does
 
-The baseline package cannot detect real emotional distress on its own — it only
-matches phrases you explicitly give it. `extra_distress_indicators` is an
-optional list of phrases that, if found in the message, get counted as an
-escalation signal:
+The baseline package ships a small built-in list of common, direct crisis
+phrases (e.g. "want to die", "kill myself", "suicidal") and will flag those on
+its own. This is **common phrase awareness only — not clinical crisis
+detection**: it catches literal phrasings but misses indirect, contextual, or
+semantic distress. `extra_distress_indicators` is an optional list of additional
+phrases that, if found in the message, also get counted as an escalation signal:
 
 ```json
 "extra_distress_indicators": ["feel hopeless", "scared"]
 ```
 
-Use it when you want to test how the pipeline reacts to distress language. Leave
-it out for normal turns. (Real, automatic distress detection is a feature of the
-licensed SASKI engine, not this baseline package.)
+Use it when you want to add scenario-specific phrases on top of the built-in
+list. Leave it out for normal turns. (Clinical-grade crisis detection that does
+not depend on a phrase list — and that catches indirect and contextual signals —
+is a feature of the licensed SASKI engine, not this baseline package.)
 
 ---
 
@@ -409,7 +412,7 @@ licensed SASKI SDK would do differently on this traffic. Each has a severity:
 
 | Signal | What it means / suggested action |
 |---|---|
-| **SIS-001** | Distress was detected using your supplied phrases only; the licensed engine detects real distress automatically. |
+| **SIS-001** | Distress was detected using a small built-in list of common crisis phrases plus any you supplied; the licensed engine provides clinical-grade detection without phrase lists and catches indirect/contextual signals. |
 | **SIS-002** | Laws were found that aren't in force yet but will be — plan for their effective dates. |
 | **SIS-003** | Some turns used multiple domains at once; double-check your domain settings per turn. |
 | **SIS-004** | Personal info was detected; the licensed engine offers stronger, jurisdiction-aware redaction. |

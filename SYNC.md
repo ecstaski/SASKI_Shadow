@@ -6,6 +6,52 @@ the registry side. Read both before resyncing.
 
 ---
 
+## Pending Registry Changes
+
+> **For Registry Cursor — not yet applied. Do NOT hand-edit `starter.py` for
+> this; it must come through the normal registry → resync flow (sections 2–3
+> below).**
+
+**California mental-health domain gap (Gap 5).** California currently has no law
+in the `mental_health` domain, so `match_laws("US-CA", "mental_health")` returns
+`[]`. Two existing California laws are relevant to mental/behavioral-health
+contexts but are tagged `healthcare` only. Decision (C=A): **add duplicate
+entries** to `laws.json` rather than reclassifying or adding a per-law domain
+list, so the existing `healthcare` coverage is left untouched.
+
+Registry Cursor needs to add the following **two new `laws.json` entries**:
+
+| New `law_id` | Mirrors existing entry | `domain` |
+|---|---|---|
+| `US-CA-AB3030-HEALTH-MH` | `US-CA-AB3030-HEALTH` | `mental_health` |
+| `US-CA-HEALTH-ADVICE-AI-MH` | `US-CA-HEALTH-ADVICE-AI` | `mental_health` |
+
+For each new entry, copy the source entry verbatim and change only:
+- `law_id` → the new `-MH`-suffixed id above
+- `domain` → `mental_health`
+
+All other fields (`jurisdiction` = `US-CA`, `citation`, `effective_date`,
+`date_added`, `note`, and the registry-only UI fields) stay identical to the
+source entry. These are duplicate cross-domain listings of the same statutes,
+not new statutes.
+
+**Downstream impact once this lands and is resynced here (do these in the same
+resync, per section 3 step 7):**
+- `STARTER_LAWS` count rises from **74 → 76**; update
+  `tests/test_laws.py::test_starter_set_has_expected_count_and_fact_only_fields`.
+- README Law Coverage `mental_health` figure changes (currently "7 laws / 6
+  states" → "9 laws / 7 states"); `test_readme_law_coverage_counts_match_starter_set`
+  enforces this in lockstep.
+- `tests/test_laws.py::test_domain_must_match_exactly` currently asserts
+  `match_laws("US-CA", "mental_health") == []`; it must be inverted to expect the
+  two new `-MH` law ids (see the TODO already placed on that test).
+- `test_exact_state_domain_match_names_specific_law` (the CA `healthcare` set)
+  stays unchanged under the duplicate-entry approach — verify it still passes.
+
+Remove this section once the resync is complete.
+
+---
+
 ## 1. What is being synced
 
 | | Source of truth | Local copy |

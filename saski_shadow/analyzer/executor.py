@@ -28,7 +28,14 @@ from datetime import datetime, timezone
 from time import perf_counter
 from typing import Any
 
-from ..detectors import detect_distress, detect_pii, evaluate_policy, review_output
+from ..detectors import (
+    detect_adversarial,
+    detect_clinical_intent,
+    detect_distress,
+    detect_pii,
+    evaluate_policy,
+    review_output,
+)
 from ..enums import PublicOutcome
 from ..hashing import (
     artifact_hash,
@@ -82,6 +89,12 @@ class BaselineAnalysisResult:
     metadata: dict[str, Any] | None
     # mode is a reporting tag only; enforcement behavior lives in the licensed SDK.
     mode: str | None = None
+    # Observation-only signals. These never block, score, or gate any outcome;
+    # they are surfaced for awareness only (common public pattern matching).
+    adversarial_signal: bool = False
+    adversarial_matches: list[str] = field(default_factory=list)
+    clinical_intent_signal: bool = False
+    clinical_intent_matches: list[str] = field(default_factory=list)
     # Redacted egress payload (PII placeholders applied) that an integrator would
     # send to the LLM. Carries no raw PII; it is the text the message_for_llm_hash
     # was computed over.
@@ -251,6 +264,16 @@ def analyze_turn(
     )
     timings["detect_distress"] = (perf_counter() - t0) * 1000.0
 
+    # Stage 3b: detect_adversarial (observation only — never blocks or scores)
+    t0 = perf_counter()
+    adversarial_signal, adversarial_matches = detect_adversarial(normalized)
+    timings["detect_adversarial"] = (perf_counter() - t0) * 1000.0
+
+    # Stage 3c: detect_clinical_intent (observation only — never blocks or scores)
+    t0 = perf_counter()
+    clinical_intent_signal, clinical_intent_matches = detect_clinical_intent(normalized)
+    timings["detect_clinical_intent"] = (perf_counter() - t0) * 1000.0
+
     # Stage 4: evaluate_policy
     t0 = perf_counter()
     signals = {
@@ -364,6 +387,11 @@ def analyze_turn(
         "domains": domains,  # full list for multi-domain matching
         # mode is a reporting tag only; enforcement behavior lives in the licensed SDK.
         "mode": normalized_mode,
+        # Observation-only signals (no scoring, no gating). Surfaced for awareness.
+        "adversarial_signal": adversarial_signal,
+        "adversarial_matches": adversarial_matches,
+        "clinical_intent_signal": clinical_intent_signal,
+        "clinical_intent_matches": clinical_intent_matches,
     }
 
     metadata = {
@@ -389,6 +417,10 @@ def analyze_turn(
         provider_id=None,
         metadata=metadata,
         mode=normalized_mode,
+        adversarial_signal=adversarial_signal,
+        adversarial_matches=adversarial_matches,
+        clinical_intent_signal=clinical_intent_signal,
+        clinical_intent_matches=clinical_intent_matches,
         message_for_llm=redacted_message,
         domain=domain,
         domains=domains,
