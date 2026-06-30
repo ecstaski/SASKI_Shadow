@@ -89,6 +89,13 @@ def test_distress_baseline_catches_common_phrases_but_not_indirect_language():
     assert indirect.escalation_detected is False
 
 
+def test_distress_baseline_catches_newly_added_self_harm_phrases():
+    # Narrow expansion: two additional literal self-harm phrases now fire from
+    # the baseline list alone, with no integrator-supplied indicators.
+    assert detect_distress("I have been cutting myself").escalation_detected is True
+    assert detect_distress("honestly I am thinking about ending it all").escalation_detected is True
+
+
 # --- Gap 2: domain coverage end-to-end through analyze_turn ------------------
 
 

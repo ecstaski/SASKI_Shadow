@@ -73,6 +73,18 @@ def test_distress_detector_matches_baseline_crisis_phrase():
     assert "kill myself" in result.matched_indicators
 
 
+def test_distress_detector_matches_cutting_myself_phrase():
+    result = detect_distress("lately I have been cutting myself")
+    assert result.escalation_detected is True
+    assert "cutting myself" in result.matched_indicators
+
+
+def test_distress_detector_matches_ending_it_all_phrase():
+    result = detect_distress("I keep thinking about ending it all")
+    assert result.escalation_detected is True
+    assert "ending it all" in result.matched_indicators
+
+
 def test_distress_detector_ignores_unrelated_text():
     result = detect_distress("the purple widget hums quietly")
     assert result.escalation_detected is False

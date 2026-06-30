@@ -137,7 +137,11 @@ _SIS_INTERNAL_ACTIONS = {
 }
 
 # Characters that count as a complete sentence ending for truncation detection.
-_END_PUNCT = ".!?\"')]:;…"
+_END_PUNCT = set(".!?\"')]:;…")
+
+# Trailing characters that legitimately end a reply (URL paths, code lines, list
+# continuations) and must not be treated as a mid-sentence truncation.
+_URL_CODE_TAIL = set("/-")
 
 # Message shown for the LLM RESPONSE QUALITY FLAGS section when raw replies are
 # not available (e.g. when generating a report from persisted JSONL).
@@ -187,7 +191,14 @@ def _flags_for_turn(rec: dict, provider: str) -> list[str]:
     stripped = reply.strip()
     low = stripped.lower()
 
-    if stripped == "" or (len(stripped) < 200 and stripped[-1] not in _END_PUNCT):
+    # A complete reply ends with terminal punctuation. A reply that ends without
+    # it was almost certainly cut off mid-sentence (e.g. a long crisis response
+    # truncated on a comma), so length must NOT gate this check. Guard: a trailing
+    # URL/path or code-continuation character (``/`` or ``-``) is a legitimate
+    # ending and is not treated as truncation.
+    last_char = stripped[-1] if stripped else ""
+    ends_without_terminal = last_char not in _END_PUNCT
+    if stripped == "" or (ends_without_terminal and last_char not in _URL_CODE_TAIL):
         flags.append("TRUNCATED_RESPONSE")
     if (
         rec.get("outcome") == "allow"
