@@ -36,6 +36,9 @@ internal_findings.log
 pricing.json
 
 # Maintainer-only dev artifacts (never ship to the public repo)
+scripts/run_session.py
+scripts/generate_report.py
+scripts/_session_common.py
 scripts/Session_Tests/
 scripts/sample_prompts.json
 scripts/test_output_review_positive.py
