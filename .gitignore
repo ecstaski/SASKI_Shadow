@@ -11,8 +11,8 @@ build/
 .DS_Store
 
 # Editor backups and packed-repo / audit dumps (keep internals out of the tree)
-# Match both plain ".bak" files and timestamped backups produced by the
-# AGENTS.md convention (e.g. report.py.bak.20260624_135223).
+# Match both plain ".bak" files and timestamped backups (e.g. report.py.bak.20260624_135223).
+# Prune local copies older than 14 days with: find . -name '*.bak.*' ... (maintainer hygiene).
 *.bak
 *.bak.*
 *_audit.txt
@@ -34,3 +34,8 @@ internal_findings.log
 # Integrator-supplied token-savings pricing inputs. Use pricing.example.json as
 # a template; the real pricing.json stays local and is never committed.
 pricing.json
+
+# Maintainer-only dev artifacts (never ship to the public repo)
+scripts/Session_Tests/
+scripts/sample_prompts.json
+scripts/test_output_review_positive.py
