@@ -1,9 +1,6 @@
-"""Tests for sdk_integration_signals (Task 1) and runner config file (Task 3)."""
+"""Tests for sdk_integration_signals section in aggregate shadow reports."""
 
 from __future__ import annotations
-
-import json
-import pathlib
 
 from saski_shadow.aggregate.report import aggregate_shadow_report
 
@@ -223,63 +220,5 @@ def test_sdk_integration_signals_section_present_in_report():
     assert "signals" in sis
 
 
-# ---------------------------------------------------------------------------
-# Task 3 — _resolve_outdir helper
-# ---------------------------------------------------------------------------
-
-def _import_resolve_outdir():
-    """Import _resolve_outdir from the scripts package, adding scripts/ to sys.path."""
-    import sys
-
-    _repo = pathlib.Path(__file__).resolve().parent.parent
-    if str(_repo) not in sys.path:
-        sys.path.insert(0, str(_repo))
-    from scripts.run_session import _resolve_outdir  # noqa: E402
-
-    return _resolve_outdir
-
-
-def test_resolve_outdir_uses_cli_flag_over_config(tmp_path):
-    _resolve_outdir = _import_resolve_outdir()
-    config_path = tmp_path / "saski_shadow_config.json"
-    config_path.write_text(json.dumps({"output_dir": "from_config"}), encoding="utf-8")
-
-    result, source = _resolve_outdir("/from/cli", tmp_path)
-    assert result == "/from/cli"
-    assert source == "cli_flag"
-
-
-def test_resolve_outdir_uses_config_when_no_cli(tmp_path):
-    _resolve_outdir = _import_resolve_outdir()
-    config_path = tmp_path / "saski_shadow_config.json"
-    config_path.write_text(json.dumps({"output_dir": "my_outputs"}), encoding="utf-8")
-
-    result, source = _resolve_outdir(None, tmp_path)
-    assert result == "my_outputs"
-    assert source == "config_file"
-
-
-def test_resolve_outdir_falls_back_to_default_when_neither(tmp_path):
-    _resolve_outdir = _import_resolve_outdir()
-    result, source = _resolve_outdir(None, tmp_path)
-    assert result == str(tmp_path / "outputs")
-    assert source == "default"
-
-
-def test_resolve_outdir_ignores_malformed_config(tmp_path):
-    _resolve_outdir = _import_resolve_outdir()
-    config_path = tmp_path / "saski_shadow_config.json"
-    config_path.write_text("not json {{", encoding="utf-8")
-
-    result, source = _resolve_outdir(None, tmp_path)
-    assert source == "default"
-
-
-def test_resolve_outdir_cli_overrides_even_when_config_present(tmp_path):
-    _resolve_outdir = _import_resolve_outdir()
-    config_path = tmp_path / "saski_shadow_config.json"
-    config_path.write_text(json.dumps({"output_dir": "config_dir"}), encoding="utf-8")
-
-    result, source = _resolve_outdir("cli_dir", tmp_path)
-    assert result == "cli_dir"
-    assert source == "cli_flag"
+# _resolve_outdir tests removed with internal scripts/run_session.py (maintainer-only).
+# Output-directory resolution is not part of the public saski_shadow package API.

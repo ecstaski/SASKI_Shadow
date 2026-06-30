@@ -1,5 +1,5 @@
 {
-  "_comment": "Copy this file to pricing.json and fill in your own numbers. Pass it with --pricing pricing.json to run_session.py or generate_report.py. pricing.json is gitignored so your figures never get committed. All values are token counts you supply; this package computes no dollar figure.",
+  "_comment": "Copy this file to pricing.json and fill in your own numbers. Pass prospect_inputs programmatically via aggregate_shadow_report() or the saski-shadow aggregate CLI --config flag. pricing.json is gitignored so your figures never get committed. All values are token counts you supply; this package computes no dollar figure.",
 
   "legacy_system_prompt_tokens": 450,
   "lean_product_prompt_tokens": 103,
