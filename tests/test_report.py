@@ -79,7 +79,7 @@ def test_by_outcome_uses_public_outcome_vocabulary_only():
     assert set(by_outcome) == {o.value for o in PublicOutcome}
 
 
-def test_unsafe_flow_categories_are_the_six_neutral_values():
+def test_unsafe_flow_categories_are_the_eight_neutral_values():
     report = aggregate_shadow_report(_sample_turns())
     categories = report["sections"]["unsafe_flow_documentation"]["categories"]
     assert set(categories) == {
@@ -88,6 +88,8 @@ def test_unsafe_flow_categories_are_the_six_neutral_values():
         "content_sanitization_gap",
         "integrator_override",
         "manual_review_required",
+        "adversarial_probe",
+        "clinical_intent_boundary",
         "other",
     }
 
@@ -481,9 +483,13 @@ def test_methodology_block_present_with_all_keys():
     assert set(methodology["report_period"]) == {"start_utc", "end_utc"}
 
 
-def test_detection_limitations_in_section_two_and_five():
+def test_detection_limitations_in_sections_two_five_and_six():
     sections = aggregate_shadow_report(_sample_turns())["sections"]
-    for name in ("compliance_exposure_examples", "escalation_signal_count"):
+    for name in (
+        "compliance_exposure_examples",
+        "escalation_signal_count",
+        "unsafe_flow_documentation",
+    ):
         limitations = sections[name]["detection_limitations"]
         assert isinstance(limitations, list) and limitations
         assert any("CSAM" in item for item in limitations)
@@ -546,3 +552,44 @@ def test_section5_escalation_disclaimer_is_clean_and_unchanged():
         "Escalation counts reflect baseline distress phrase-list matches only and are "
         "not clinical crisis detection."
     )
+
+
+def test_adversarial_probe_in_unsafe_flows_when_signal_fires():
+    turn = _turn(0, "sess_adv")
+    turn["engine_summary"]["adversarial_signal"] = True
+    turn["engine_summary"]["adversarial_matches"] = ["jailbreak_phrase"]
+    flows = aggregate_shadow_report([turn])["sections"]["unsafe_flow_documentation"]
+    items = flows["categories"]["adversarial_probe"]
+    assert len(items) == 1
+    assert items[0]["signals"]["adversarial_matches"] == ["jailbreak_phrase"]
+
+
+def test_clinical_intent_boundary_in_unsafe_flows_when_signal_fires():
+    turn = _turn(0, "sess_clin")
+    turn["engine_summary"]["clinical_intent_signal"] = True
+    turn["engine_summary"]["clinical_intent_matches"] = ["diagnosis_request"]
+    flows = aggregate_shadow_report([turn])["sections"]["unsafe_flow_documentation"]
+    items = flows["categories"]["clinical_intent_boundary"]
+    assert len(items) == 1
+    assert items[0]["signals"]["clinical_intent_matches"] == ["diagnosis_request"]
+
+
+def test_next_steps_derived_from_session_signals():
+    turns = [
+        _turn(0, "s", pii=True, pii_types=["email"]),
+        _turn(1, "s", escalation=True),
+    ]
+    turn = _turn(2, "s")
+    turn["engine_summary"]["clinical_intent_signal"] = True
+    turns.append(turn)
+    next_steps = aggregate_shadow_report(turns)["sections"]["recommended_path"]["next_steps"]
+    assert "Integrator-defined next step" not in next_steps
+    assert any("Clinical boundary requests detected" in step for step in next_steps)
+    assert any("Distress signals detected" in step for step in next_steps)
+    assert any("PII detected in user messages" in step for step in next_steps)
+
+
+def test_next_steps_always_includes_contact_line():
+    report = aggregate_shadow_report([_turn(0, "sess_clean")])
+    next_steps = report["sections"]["recommended_path"]["next_steps"]
+    assert any("info@techviz.us" in step for step in next_steps)

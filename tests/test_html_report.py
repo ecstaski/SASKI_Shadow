@@ -122,5 +122,5 @@ def test_insufficient_inputs_report_still_renders():
     # No pricing -> token savings basis insufficient; renderer must not crash.
     report = aggregate_shadow_report([_turn(0)])
     html = render_html_report(report)
-    assert "insufficient_inputs" in html
+    assert "Pricing inputs required" in html
     assert "3. Token Savings Calculation" in html

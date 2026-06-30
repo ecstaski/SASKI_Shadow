@@ -460,6 +460,10 @@
       "required": ["section", "categories", "examples"],
       "properties": {
         "section": { "type": "string", "const": "unsafe_flow_documentation" },
+        "detection_limitations": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
         "categories": {
           "type": "object",
           "additionalProperties": false,
@@ -469,6 +473,8 @@
             "content_sanitization_gap",
             "integrator_override",
             "manual_review_required",
+            "adversarial_probe",
+            "clinical_intent_boundary",
             "other"
           ],
           "properties": {
@@ -477,6 +483,8 @@
             "content_sanitization_gap": { "type": "array", "items": { "type": "object" } },
             "integrator_override": { "type": "array", "items": { "type": "object" } },
             "manual_review_required": { "type": "array", "items": { "type": "object" } },
+            "adversarial_probe": { "type": "array", "items": { "type": "object" } },
+            "clinical_intent_boundary": { "type": "array", "items": { "type": "object" } },
             "other": { "type": "array", "items": { "type": "object" } }
           }
         },
@@ -496,6 +504,8 @@
                   "content_sanitization_gap",
                   "integrator_override",
                   "manual_review_required",
+                  "adversarial_probe",
+                  "clinical_intent_boundary",
                   "other"
                 ]
               },
@@ -506,7 +516,15 @@
                   "enforcement_suppressed": { "type": "boolean" },
                   "would_block": { "type": "boolean" },
                   "outcome": { "$ref": "#/$defs/public_outcome" },
-                  "human_review_required": { "type": "boolean" }
+                  "human_review_required": { "type": "boolean" },
+                  "adversarial_matches": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  },
+                  "clinical_intent_matches": {
+                    "type": "array",
+                    "items": { "type": "string" }
+                  }
                 }
               },
               "recommended_behavior": { "type": "string" },

@@ -102,6 +102,11 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .note { background: var(--bg); border-radius: 8px; padding: 11px 14px; font-size: 12.5px;
   color: var(--muted); margin: 10px 0; }
 .disclaimer { font-size: 12px; color: var(--muted); font-style: italic; margin-top: 12px; }
+.disclaimer-details { margin-top: 12px; font-size: 12.5px; color: var(--muted); }
+.disclaimer-details summary { cursor: pointer; font-weight: 600; color: var(--navy);
+  font-style: normal; }
+.callout { background: #e9f4ec; border: 1px solid #c5e0cc; border-radius: 8px;
+  padding: 12px 16px; margin: 10px 0 14px; font-size: 14px; color: var(--navy); }
 .law { border: 1px solid var(--border); border-radius: 8px; padding: 10px 13px;
   margin: 8px 0; }
 .law .id { font-weight: 700; color: var(--navy); }
@@ -293,12 +298,32 @@ def _render_pii(s: dict[str, Any]) -> str:
 
 
 def _law_domain_label(law: dict[str, Any]) -> str:
-    """Resolve a law's domain tag for display (``domains`` list or legacy ``domain``)."""
+    """Resolve matched domain tags for display (``matched_domains`` preferred)."""
+    matched = law.get("matched_domains")
+    if isinstance(matched, list) and matched:
+        return ", ".join(str(d) for d in matched)
     domains = law.get("domains")
     if isinstance(domains, list) and domains:
         return ", ".join(str(d) for d in domains)
     value = law.get("domain")
     return str(value) if value else ""
+
+
+_BASIS_LABELS = {
+    "estimated_from_integrator_inputs": "Estimated from your inputs",
+    "insufficient_inputs": "Pricing inputs required",
+}
+
+_UNSAFE_FLOW_LABELS = {
+    "enforcement_would_block": "Enforcement Would Block",
+    "policy_boundary_failure": "Policy Boundary Failure",
+    "content_sanitization_gap": "Content Sanitization Gap",
+    "integrator_override": "Integrator Override",
+    "manual_review_required": "Manual Review Required",
+    "adversarial_probe": "Adversarial Probe Detected",
+    "clinical_intent_boundary": "Clinical Boundary Request",
+    "other": "Other",
+}
 
 
 def _render_compliance(s: dict[str, Any]) -> str:
@@ -356,25 +381,42 @@ def _render_token_savings(s: dict[str, Any]) -> str:
         "Estimate computed by transparent arithmetic from two integrator inputs "
         "applied to observed governance tiers. Dollar figures are never computed.",
     )
-    html += f'<div class="note">Basis: <b>{_esc(s.get("basis"))}</b></div>'
+    basis_raw = s.get("basis")
+    basis_label = _BASIS_LABELS.get(str(basis_raw), str(basis_raw or ""))
+    html += f'<div class="note">Basis: <b>{_esc(basis_label)}</b></div>'
+
+    total_saved = savings.get("tokens_saved_estimate")
+    total_turns = measured.get("total_turns")
+    if total_saved is not None and total_turns:
+        avg = total_saved / total_turns
+        html += (
+            f'<div class="callout"><b>{_fmt_num(total_saved)} tokens saved across '
+            f'{_fmt_num(total_turns)} turns (~{_fmt_num(round(avg))}/turn avg)</b></div>'
+        )
 
     html += '<div class="stat-grid">'
     html += _stat(measured.get("total_turns"), "Total turns")
-    html += _stat(measured.get("tier_clean_turns"), "Tier 1 (clean)")
-    html += _stat(measured.get("tier_warning_turns"), "Tier 2 (warning)")
-    html += _stat(measured.get("tier_escalation_turns"), "Tier 3 (escalation)")
+    html += _stat(measured.get("tier_clean_turns"), "Clean turns")
+    html += _stat(measured.get("tier_warning_turns"), "Warning turns")
+    html += _stat(measured.get("tier_escalation_turns"), "Escalation turns")
     html += _stat(measured.get("regulated_mode_turns"), "Regulated-mode turns")
     html += "</div>"
 
     rows = [
         ("Legacy system prompt tokens (input)", inputs.get("legacy_system_prompt_tokens")),
         ("Lean product prompt tokens (input)", inputs.get("lean_product_prompt_tokens")),
-        ("Regulated-mode floor tokens", model.get("regulated_mode_floor_tokens")),
-        ("Warning append tokens", model.get("warning_append_tokens")),
+        (
+            "Regulated-mode floor tokens (SDK regulated mode floor)",
+            model.get("regulated_mode_floor_tokens"),
+        ),
+        (
+            "Warning append tokens (warning context append)",
+            model.get("warning_append_tokens"),
+        ),
         ("Tier 3 LLM tokens (enforce mode)", model.get("tier3_llm_tokens")),
-        ("Tokens saved \u2014 Tier 1", savings.get("tier_clean_tokens_saved")),
-        ("Tokens saved \u2014 Tier 2", savings.get("tier_warning_tokens_saved")),
-        ("Tokens saved \u2014 Tier 3", savings.get("tier_escalation_tokens_saved")),
+        ("Tokens saved — Clean turns", savings.get("tier_clean_tokens_saved")),
+        ("Tokens saved — Warning turns", savings.get("tier_warning_tokens_saved")),
+        ("Tokens saved — Escalation turns", savings.get("tier_escalation_tokens_saved")),
     ]
     rows_html = "".join(
         f"<tr><td>{_esc(label)}</td><td class='num'>{_fmt_num(value)}</td></tr>"
@@ -392,7 +434,12 @@ def _render_token_savings(s: dict[str, Any]) -> str:
     if measured.get("shadow_mode_note"):
         html += f'<div class="note">{_esc(measured["shadow_mode_note"])}</div>'
     if s.get("disclaimer"):
-        html += f'<p class="disclaimer">{_esc(s["disclaimer"])}</p>'
+        html += (
+            f'<details class="disclaimer-details">'
+            f'<summary>How is this calculated?</summary>'
+            f'<p class="disclaimer">{_esc(s["disclaimer"])}</p>'
+            f"</details>"
+        )
     return html + "</section>"
 
 
@@ -446,6 +493,8 @@ def _render_escalation(s: dict[str, Any]) -> str:
 
     if s.get("baseline_only_caveat"):
         html += f'<div class="note">{_esc(s["baseline_only_caveat"])}</div>'
+    for limitation in s.get("detection_limitations", []) or []:
+        html += f'<div class="note">{_esc(limitation)}</div>'
     if s.get("disclaimer"):
         html += f'<p class="disclaimer">{_esc(s["disclaimer"])}</p>'
     return html + "</section>"
@@ -461,15 +510,18 @@ def _render_unsafe_flows(s: dict[str, Any]) -> str:
     nonempty = {k: v for k, v in categories.items() if v}
     if not nonempty:
         html += '<p class="empty">No unsafe flows observed in this session.</p>'
-        return html + "</section>"
-    rows = "".join(
-        f"<tr><td>{_esc(name)}</td><td class='num'>{_fmt_num(len(items))}</td></tr>"
-        for name, items in nonempty.items()
-    )
-    html += (
-        "<table><tr><th>Category</th><th class='num'>Turns observed</th></tr>"
-        f"{rows}</table>"
-    )
+    else:
+        rows = "".join(
+            f"<tr><td>{_esc(_UNSAFE_FLOW_LABELS.get(name, name))}</td>"
+            f"<td class='num'>{_fmt_num(len(items))}</td></tr>"
+            for name, items in nonempty.items()
+        )
+        html += (
+            "<table><tr><th>Category</th><th class='num'>Turns observed</th></tr>"
+            f"{rows}</table>"
+        )
+    for limitation in s.get("detection_limitations", []) or []:
+        html += f'<div class="note">{_esc(limitation)}</div>'
     return html + "</section>"
 
 

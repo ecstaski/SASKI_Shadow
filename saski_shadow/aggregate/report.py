@@ -635,24 +635,34 @@ def _section_unsafe_flows(turns: list[dict[str, Any]]) -> dict[str, Any]:
         "content_sanitization_gap": [],
         "integrator_override": [],
         "manual_review_required": [],
+        "adversarial_probe": [],
+        "clinical_intent_boundary": [],
         "other": [],
     }
     examples: list[dict[str, Any]] = []
 
-    def _record(turn: dict[str, Any], category: str, recommended: str) -> None:
+    def _record(
+        turn: dict[str, Any],
+        category: str,
+        recommended: str,
+        extra_signals: dict[str, Any] | None = None,
+    ) -> None:
         summary = _engine_summary(turn)
         deployment = turn.get("deployment_decision") or {}
         outcome = summary.get("outcome")
+        signals: dict[str, Any] = {
+            "enforcement_suppressed": bool(deployment.get("enforcement_suppressed")),
+            "would_block": bool(summary.get("would_block")),
+            "outcome": outcome if outcome in _OUTCOME_KEYS else None,
+            "human_review_required": outcome == PublicOutcome.HUMAN_REVIEW.value,
+        }
+        if extra_signals:
+            signals.update(extra_signals)
         finding = {
             "turn_index": turn.get("turn_index", 0),
             "session_id": turn.get("session_id", ""),
             "category": category,
-            "signals": {
-                "enforcement_suppressed": bool(deployment.get("enforcement_suppressed")),
-                "would_block": bool(summary.get("would_block")),
-                "outcome": outcome if outcome in _OUTCOME_KEYS else None,
-                "human_review_required": outcome == PublicOutcome.HUMAN_REVIEW.value,
-            },
+            "signals": signals,
             "recommended_behavior": recommended,
             "observed_llm_response_hash": turn.get("output_hash") or turn.get("response_hash"),
             "analyst_note": "",
@@ -676,8 +686,32 @@ def _section_unsafe_flows(turns: list[dict[str, Any]]) -> dict[str, Any]:
         if review.get("policy_boundary_hits"):
             _record(turn, "policy_boundary_failure", "Review integrator policy boundary handling")
 
+        if summary.get("adversarial_signal"):
+            extra: dict[str, Any] = {}
+            matches = summary.get("adversarial_matches")
+            if isinstance(matches, list) and matches:
+                extra["adversarial_matches"] = matches
+            _record(
+                turn,
+                "adversarial_probe",
+                "Review adversarial probe handling; route to licensed SDK adversarial detection",
+                extra or None,
+            )
+        if summary.get("clinical_intent_signal"):
+            extra = {}
+            matches = summary.get("clinical_intent_matches")
+            if isinstance(matches, list) and matches:
+                extra["clinical_intent_matches"] = matches
+            _record(
+                turn,
+                "clinical_intent_boundary",
+                "Verify clinical boundary routing; do not present as licensed clinical care",
+                extra or None,
+            )
+
     return {
         "section": "unsafe_flow_documentation",
+        "detection_limitations": list(DETECTION_LIMITATIONS),
         "categories": categories,
         "examples": examples,
     }
@@ -754,11 +788,14 @@ def _section_recommended_path(
     turns: list[dict[str, Any]],
     prospect_inputs: dict[str, Any],
     latency_section: dict[str, Any],
+    compliance_section: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     total = len(turns)
     tier_counts = dict.fromkeys(_TIERS, 0)
     turns_with_pii = 0
     escalation_turns = 0
+    adversarial_fired = False
+    clinical_intent_fired = False
     for turn in turns:
         tier_counts[_governance_tier(turn)] += 1
         summary = _engine_summary(turn)
@@ -766,6 +803,10 @@ def _section_recommended_path(
             turns_with_pii += 1
         if summary.get("escalation_detected"):
             escalation_turns += 1
+        if summary.get("adversarial_signal"):
+            adversarial_fired = True
+        if summary.get("clinical_intent_signal"):
+            clinical_intent_fired = True
 
     def _pct(count: int) -> float:
         return (count / total * 100.0) if total else 0.0
@@ -774,6 +815,49 @@ def _section_recommended_path(
         latency_section["aggregate"]["exceeded_integrator_target_count"] == 0
         and latency_section["aggregate"]["exceeded_hosted_target_count"] == 0
     )
+
+    future_effective_count = 0
+    if compliance_section:
+        future_effective_count = (
+            compliance_section.get("law_match_summary", {}).get("future_effective_count") or 0
+        )
+
+    next_steps: list[str] = []
+    if adversarial_fired:
+        next_steps.append(
+            "Adversarial probes detected — configure licensed SDK adversarial "
+            "detection before production deployment."
+        )
+    if clinical_intent_fired:
+        next_steps.append(
+            "Clinical boundary requests detected — verify licensed SDK clinical "
+            "intent classification is configured for this deployment."
+        )
+    if escalation_turns > 0:
+        next_steps.append(
+            "Distress signals detected — verify crisis detection path with "
+            "licensed SDK before production deployment."
+        )
+    if turns_with_pii > 0:
+        next_steps.append(
+            "PII detected in user messages — verify licensed SDK HIPAA-tier "
+            "redaction is configured for jurisdiction and mode."
+        )
+    if future_effective_count > 0:
+        next_steps.append(
+            "Future-effective laws matched — schedule registry update reviews "
+            "before effective dates."
+        )
+    next_steps.append(
+        "Contact info@techviz.us to configure the licensed SASKI SDK for production enforcement."
+    )
+
+    if escalation_turns > 0:
+        subset_description = "Prioritize crisis and distress flows"
+    elif turns_with_pii > 0:
+        subset_description = "Prioritize PII-handling flows"
+    else:
+        subset_description = "All observed session flows"
 
     return {
         "section": "recommended_path",
@@ -789,7 +873,7 @@ def _section_recommended_path(
         },
         "enforce_rollout": {
             "strategy": "all_flows",
-            "subset_description": "Integrator-defined cohort description",
+            "subset_description": subset_description,
             "estimated_days_to_full_enforce": None,
         },
         "findings_summary": {
@@ -798,7 +882,7 @@ def _section_recommended_path(
             "compliance_gaps": [],
             "latency_acceptable": latency_acceptable,
         },
-        "next_steps": ["Integrator-defined next step"],
+        "next_steps": next_steps,
     }
 
 
@@ -1096,16 +1180,19 @@ def aggregate_shadow_report(
     period = _resolve_period(turns, period_start_utc, period_end_utc)
 
     latency_section = _section_latency(turns, latency_targets)
+    compliance_section = _section_compliance(turns, prospect_inputs)
 
     sections = {
         "pii_phi_detection_summary": _section_pii(turns, period),
-        "compliance_exposure_examples": _section_compliance(turns, prospect_inputs),
+        "compliance_exposure_examples": compliance_section,
         "token_savings_calculation": _section_token_savings(turns, prospect_inputs),
         "envelope_evidence_sample": _section_envelope_sample(turns),
         "escalation_signal_count": _section_escalation(turns),
         "unsafe_flow_documentation": _section_unsafe_flows(turns),
         "latency_impact_report": latency_section,
-        "recommended_path": _section_recommended_path(turns, prospect_inputs, latency_section),
+        "recommended_path": _section_recommended_path(
+            turns, prospect_inputs, latency_section, compliance_section
+        ),
     }
     sections["sdk_integration_signals"] = _section_sdk_integration_signals(turns, sections)
 
