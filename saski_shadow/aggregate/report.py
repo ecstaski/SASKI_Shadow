@@ -62,6 +62,9 @@ TOKEN_SAVINGS_DISCLAIMER = (
 # reader cannot mistake baseline observation for full enforcement coverage.
 DETECTION_LIMITATIONS = [
     "CSAM content detection requires an upstream classifier; this package does not detect CSAM.",
+    "Output PII review uses the same regex patterns as input detection. Paraphrased or "
+    "encoded PII in model responses (for example, word-spelled digits, substituted "
+    "characters, or reworded identifiers) may not be detected.",
     "Distress detection uses a small baseline list of common crisis phrases plus "
     "integrator-supplied indicators. This is common phrase awareness only — not "
     "clinical crisis detection. The licensed SASKI SDK provides clinical-grade "
