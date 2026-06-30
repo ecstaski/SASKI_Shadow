@@ -69,6 +69,24 @@ _VALID_MODES = {
     "default",
 }
 
+# Shadow-internal mode → default compliance domain tags. Used only when a turn
+# carries no explicit ``domain`` / ``domains`` in session_context. Integrator-
+# supplied domain metadata always wins over this mapping.
+MODE_TO_DOMAINS: dict[str, list[str]] = {
+    "mental_health_support": ["mental_health", "consumer_chatbot"],
+    "patient": ["healthcare"],
+    "therapist": ["healthcare", "mental_health"],
+    "child": ["consumer_chatbot", "csam"],
+    "student": ["consumer_chatbot"],
+    "hr_recruiting": ["employment"],
+    "wellness_coaching": ["mental_health", "consumer_chatbot"],
+    "career_coaching": ["consumer_chatbot"],
+    "business": ["consumer_chatbot"],
+    "general_assistant": ["consumer_chatbot"],
+    "sports_coaching": ["consumer_chatbot"],
+    "default": ["consumer_chatbot"],
+}
+
 
 @dataclass
 class BaselineAnalysisResult:
@@ -184,24 +202,37 @@ def _normalize_mode(mode: str | None) -> str | None:
     return None
 
 
-def _normalize_domains(session_context: dict[str, Any]) -> list[str]:
+def _normalize_domains(
+    session_context: dict[str, Any], mode: str | None = None
+) -> tuple[list[str], str]:
     """Resolve a turn's compliance domain(s) into a list of domain strings.
 
-    Precedence: a non-empty ``domains`` list wins; otherwise a non-empty
-    ``domain`` string becomes a one-element list; otherwise ``[]``. This is pure
-    factual passthrough of integrator-supplied metadata for downstream law
-    matching — it interprets nothing and never raises. Invalid types (a non-list
-    ``domains`` or a non-string ``domain``) fall back to ``[]`` silently.
+    Precedence (highest first):
+    1. Non-empty explicit ``domains`` list in session_context
+    2. Non-empty explicit ``domain`` string in session_context
+    3. Mode-derived defaults from ``MODE_TO_DOMAINS`` when ``mode`` is set
+    4. ``[]`` when nothing applies
+
+    Explicit ``domain`` / ``domains`` in session_context always override mode-
+    derived defaults. Invalid types fall back silently within each tier.
+
+    Returns ``(domains, source)`` where ``source`` is ``"explicit"``,
+    ``"mode_derived"``, or ``"none"``.
     """
     plural = session_context.get("domains")
     if isinstance(plural, list):
         cleaned = [d for d in plural if isinstance(d, str) and d]
         if cleaned:
-            return cleaned
+            return cleaned, "explicit"
     single = session_context.get("domain")
     if isinstance(single, str) and single:
-        return [single]
-    return []
+        return [single], "explicit"
+
+    normalized_mode = _normalize_mode(mode)
+    if normalized_mode:
+        mapped = MODE_TO_DOMAINS.get(normalized_mode, ["consumer_chatbot"])
+        return list(mapped), "mode_derived"
+    return [], "none"
 
 
 def _jurisdiction_source(session_context: dict[str, Any]) -> str:
@@ -228,8 +259,10 @@ def analyze_turn(
             through factually and are not interpreted as safety signals. Compliance
             domain may be supplied either as ``domain`` (a single string) or as
             ``domains`` (a list of strings); ``domains`` takes precedence when both
-            are present. The result carries the full ``domains`` list plus a
-            ``domain`` mirror of the first element for backward compatibility.
+            are present. When neither is set, compliance domains are derived from
+            ``mode`` via an internal mapping (see ``MODE_TO_DOMAINS``). The result
+            carries the full ``domains`` list plus a ``domain`` mirror of the first
+            element for backward compatibility.
         policy: Optional integrator policy dict evaluated against turn signals.
         mode: Optional public operating-mode tag (e.g. ``"child"``,
             ``"patient"``, ``"general_assistant"``). It is recorded on the result
@@ -370,7 +403,7 @@ def analyze_turn(
     user_jurisdiction = session_context.get("user_jurisdiction")
     # domains is the full integrator-supplied list; domain mirrors the first
     # element for backward compatibility with single-domain consumers.
-    domains = _normalize_domains(session_context)
+    domains, domains_source = _normalize_domains(session_context, normalized_mode)
     domain = domains[0] if domains else None
 
     engine_summary = {
@@ -385,6 +418,7 @@ def analyze_turn(
         "user_jurisdiction": str(user_jurisdiction) if user_jurisdiction else None,
         "domain": domain,  # backward compat — first domain only
         "domains": domains,  # full list for multi-domain matching
+        "domains_source": domains_source,  # explicit | mode_derived | none
         # mode is a reporting tag only; enforcement behavior lives in the licensed SDK.
         "mode": normalized_mode,
         # Observation-only signals (no scoring, no gating). Surfaced for awareness.

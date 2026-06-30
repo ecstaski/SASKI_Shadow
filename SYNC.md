@@ -6,52 +6,6 @@ the registry side. Read both before resyncing.
 
 ---
 
-## Pending Registry Changes
-
-> **For Registry Cursor — not yet applied. Do NOT hand-edit `starter.py` for
-> this; it must come through the normal registry → resync flow (sections 2–3
-> below).**
-
-**California mental-health domain gap (Gap 5).** California currently has no law
-in the `mental_health` domain, so `match_laws("US-CA", "mental_health")` returns
-`[]`. Two existing California laws are relevant to mental/behavioral-health
-contexts but are tagged `healthcare` only. Decision (C=A): **add duplicate
-entries** to `laws.json` rather than reclassifying or adding a per-law domain
-list, so the existing `healthcare` coverage is left untouched.
-
-Registry Cursor needs to add the following **two new `laws.json` entries**:
-
-| New `law_id` | Mirrors existing entry | `domain` |
-|---|---|---|
-| `US-CA-AB3030-HEALTH-MH` | `US-CA-AB3030-HEALTH` | `mental_health` |
-| `US-CA-HEALTH-ADVICE-AI-MH` | `US-CA-HEALTH-ADVICE-AI` | `mental_health` |
-
-For each new entry, copy the source entry verbatim and change only:
-- `law_id` → the new `-MH`-suffixed id above
-- `domain` → `mental_health`
-
-All other fields (`jurisdiction` = `US-CA`, `citation`, `effective_date`,
-`date_added`, `note`, and the registry-only UI fields) stay identical to the
-source entry. These are duplicate cross-domain listings of the same statutes,
-not new statutes.
-
-**Downstream impact once this lands and is resynced here (do these in the same
-resync, per section 3 step 7):**
-- `STARTER_LAWS` count rises from **74 → 76**; update
-  `tests/test_laws.py::test_starter_set_has_expected_count_and_fact_only_fields`.
-- README Law Coverage `mental_health` figure changes (currently "7 laws / 6
-  states" → "9 laws / 7 states"); `test_readme_law_coverage_counts_match_starter_set`
-  enforces this in lockstep.
-- `tests/test_laws.py::test_domain_must_match_exactly` currently asserts
-  `match_laws("US-CA", "mental_health") == []`; it must be inverted to expect the
-  two new `-MH` law ids (see the TODO already placed on that test).
-- `test_exact_state_domain_match_names_specific_law` (the CA `healthcare` set)
-  stays unchanged under the duplicate-entry approach — verify it still passes.
-
-Remove this section once the resync is complete.
-
----
-
 ## 1. What is being synced
 
 | | Source of truth | Local copy |
@@ -99,7 +53,7 @@ changed, so the diff you apply to `starter.py` is intentional and minimal.
    `laws.json` — never hand-type it:
 
    ```
-   law_id, jurisdiction, domain, citation, effective_date, date_added, note
+   law_id, jurisdiction, domains, citation, effective_date, date_added, note
    ```
 
 5. **Apply the changes to `STARTER_LAWS`** in `saski_shadow/laws/starter.py`:
@@ -145,7 +99,7 @@ changed, so the diff you apply to `starter.py` is intentional and minimal.
 |---|---|
 | `law_id` | `law_id` |
 | `jurisdiction` | `jurisdiction` |
-| `domain` | `domain` |
+| `domains` | `domains` |
 | `citation` | `citation` |
 | `effective_date` | `effective_date` |
 | `date_added` | `date_added` |
@@ -166,9 +120,9 @@ Note the field-order difference: `laws.json` emits
 | `display_name` | UI display string |
 | `sample_prompts` | Demo/illustration data |
 
-The signal layer matches purely on `jurisdiction` (hierarchical) and `domain`
-(exact) and reports the public statute facts; the dropped fields play no part
-in that.
+The signal layer matches purely on `jurisdiction` (hierarchical) and `domains`
+(set intersection with session domains) and reports the public statute facts;
+the dropped fields play no part in that.
 
 ---
 
@@ -189,3 +143,14 @@ in that.
 this sync relationship from the registry side; this file (`SYNC.md`) is the
 saski-shadow side of the same contract. If the two ever disagree, the registry
 wins for content and Stephen decides how `starter.py` adapts.
+
+---
+
+## 7. Cross-repo note (SDK field mapping)
+
+`FIELD_MAPPING_SHADOW_TO_SDK.md` in the private **sasi-sdk** repo documents how
+shadow session fields map to SDK concepts. The row for `domain` ("No direct field
+entry") should be updated to note that **`effective_domains` is a planned SDK
+feature** per **ENG-EFFECTIVE-DOMAINS-001**. Shadow now derives compliance
+domains from `mode` when explicit `domain` / `domains` are absent; the SDK
+equivalent will live in that feature.

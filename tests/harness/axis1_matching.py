@@ -13,12 +13,24 @@ from __future__ import annotations
 
 from saski_shadow.aggregate.report import _split_laws_by_effective_date, _today_utc
 from saski_shadow.laws import STARTER_LAWS, coverage_summary, match_laws
+from saski_shadow.laws.starter import _law_domains
 
 # Derived golden tables (single source of truth: the registry itself).
-_PAIRS = sorted({(law["jurisdiction"], law["domain"]) for law in STARTER_LAWS})
+_PAIRS = sorted(
+    {
+        (law["jurisdiction"], domain)
+        for law in STARTER_LAWS
+        for domain in _law_domains(law)
+    }
+)
 _DISTINCT_JURISDICTIONS = sorted({law["jurisdiction"] for law in STARTER_LAWS})
-_FEDERAL_DOMAINS = {law["domain"] for law in STARTER_LAWS if law["jurisdiction"] == "US"}
-_ALL_DOMAINS = sorted({law["domain"] for law in STARTER_LAWS})
+_FEDERAL_DOMAINS = {
+    domain
+    for law in STARTER_LAWS
+    if law["jurisdiction"] == "US"
+    for domain in _law_domains(law)
+}
+_ALL_DOMAINS = sorted({domain for law in STARTER_LAWS for domain in _law_domains(law)})
 
 
 # --- Gap 1: jurisdiction coverage (all 36 jurisdictions) --------------------
@@ -39,7 +51,12 @@ def test_every_distinct_jurisdiction_has_some_coverage():
     # its own domains. Reported as a list so genuine registry gaps are visible.
     uncovered = []
     for jur in _DISTINCT_JURISDICTIONS:
-        domains = {law["domain"] for law in STARTER_LAWS if law["jurisdiction"] == jur}
+        domains = {
+            domain
+            for law in STARTER_LAWS
+            if law["jurisdiction"] == jur
+            for domain in _law_domains(law)
+        }
         if not any(match_laws(jur, d) for d in domains):
             uncovered.append(jur)
     assert uncovered == [], f"jurisdictions with zero coverage: {uncovered}"
@@ -87,18 +104,18 @@ def test_federal_turn_never_surfaces_state_only_laws():
 
 def test_ca_healthcare_excludes_employment_and_csam():
     matched = match_laws("US-CA", "healthcare")
-    domains = {law["domain"] for law in matched}
+    matched_domains = {d for law in matched for d in law["matched_domains"]}
     assert matched
-    assert domains == {"healthcare"}
-    assert not (domains & {"employment", "csam"})
+    assert matched_domains == {"healthcare"}
+    assert not (matched_domains & {"employment", "csam"})
 
 
 def test_ca_employment_excludes_healthcare_and_csam():
     matched = match_laws("US-CA", "employment")
-    domains = {law["domain"] for law in matched}
+    matched_domains = {d for law in matched for d in law["matched_domains"]}
     assert matched
-    assert domains == {"employment"}
-    assert not (domains & {"healthcare", "csam"})
+    assert matched_domains == {"employment"}
+    assert not (matched_domains & {"healthcare", "csam"})
 
 
 def test_ny_state_turn_excludes_nyc_only_law():
@@ -112,7 +129,7 @@ def test_each_single_domain_request_returns_only_that_domain():
     for domain in _ALL_DOMAINS:
         matched = match_laws("US", domain)
         for law in matched:
-            assert law["domain"] == domain
+            assert domain in law["matched_domains"]
 
 
 # --- Gap 6: future_effective in matching ------------------------------------

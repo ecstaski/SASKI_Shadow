@@ -292,6 +292,15 @@ def _render_pii(s: dict[str, Any]) -> str:
     return html + "</section>"
 
 
+def _law_domain_label(law: dict[str, Any]) -> str:
+    """Resolve a law's domain tag for display (``domains`` list or legacy ``domain``)."""
+    domains = law.get("domains")
+    if isinstance(domains, list) and domains:
+        return ", ".join(str(d) for d in domains)
+    value = law.get("domain")
+    return str(value) if value else ""
+
+
 def _render_compliance(s: dict[str, Any]) -> str:
     summary = s.get("law_match_summary", {})
     by_status = s.get("matched_laws_by_status", {})
@@ -316,7 +325,7 @@ def _render_compliance(s: dict[str, Any]) -> str:
                 f'<span class="pill {css}">{_esc(label)}</span> '
                 f'<span class="id">{_esc(law.get("law_id"))}</span> '
                 f'<span class="cite">\u2014 {_esc(law.get("jurisdiction"))} / '
-                f'{_esc(law.get("domain"))}</span>'
+                f'{_esc(_law_domain_label(law))}</span>'
                 f'<div class="cite">{_esc(law.get("citation"))}</div>'
                 "</div>"
             )

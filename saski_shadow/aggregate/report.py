@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from ..enums import PublicOutcome
+from ..analyzer.executor import _normalize_domains
 from ..laws import (
     LAW_SET_SYNC_DATE,
     LAW_SET_VERSION,
@@ -131,9 +132,9 @@ def _today_utc() -> str:
 
 
 def _split_laws_by_effective_date(
-    laws: list[dict[str, str]],
+    laws: list[dict[str, Any]],
     today_iso: str,
-) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Partition matched laws into (in_force, future_effective) buckets.
 
     A law is ``in_force`` when its ``effective_date`` is absent/blank or is a
@@ -142,8 +143,8 @@ def _split_laws_by_effective_date(
     ``effective_date`` is a parseable date strictly after today. Laws are never
     dropped; an unparseable date is treated conservatively as in_force.
     """
-    in_force: list[dict[str, str]] = []
-    future: list[dict[str, str]] = []
+    in_force: list[dict[str, Any]] = []
+    future: list[dict[str, Any]] = []
     for law in laws:
         effective = str(law.get("effective_date") or "").strip()
         if len(effective) == 10 and effective > today_iso:
@@ -274,22 +275,37 @@ def _turn_domain(
 
     Precedence: an explicit ``domains`` list on the turn, then a per-turn
     ``domain`` (string or list), then the engine_summary passthrough, then a
-    single report-level fallback. A single string stays a string for full
-    backward compatibility; a list is passed through so one turn can surface
-    laws across multiple domains.
+    single report-level fallback. When still empty, derives defaults from
+    ``engine_summary.mode`` (same mapping as ``analyze_turn``). A single string
+    stays a string for full backward compatibility; a list is passed through so
+    one turn can surface laws across multiple domains.
     """
+    summary = _engine_summary(turn)
+    ctx: dict[str, Any] = {}
+
     plural = turn.get("domains")
     if isinstance(plural, list):
         cleaned = [str(d) for d in plural if isinstance(d, str) and d]
-        return cleaned or None
+        if cleaned:
+            ctx["domains"] = cleaned
 
-    value = turn.get("domain") or _engine_summary(turn).get("domain")
-    if not value:
-        value = prospect_inputs.get("domain")
-    if isinstance(value, list):
-        cleaned = [str(d) for d in value if isinstance(d, str) and d]
-        return cleaned or None
-    return str(value) if value else None
+    if not ctx:
+        value = turn.get("domain") or summary.get("domain")
+        if not value:
+            value = prospect_inputs.get("domain")
+        if isinstance(value, list):
+            cleaned = [str(d) for d in value if isinstance(d, str) and d]
+            if cleaned:
+                ctx["domains"] = cleaned
+        elif value:
+            ctx["domain"] = str(value)
+
+    domains, _ = _normalize_domains(ctx, summary.get("mode"))
+    if not domains:
+        return None
+    if len(domains) == 1:
+        return domains[0]
+    return domains
 
 
 def _section_compliance(
@@ -303,7 +319,7 @@ def _section_compliance(
 
     turns_with_jurisdiction_metadata = 0
     turns_with_law_match = 0
-    matched_laws_by_id: dict[str, dict[str, str]] = {}
+    matched_laws_by_id: dict[str, dict[str, Any]] = {}
 
     for turn in turns:
         summary = _engine_summary(turn)

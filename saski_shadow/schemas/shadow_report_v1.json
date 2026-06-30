@@ -114,11 +114,24 @@
     "starter_law": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["law_id", "jurisdiction", "domain", "citation", "effective_date", "date_added", "note"],
+      "required": ["law_id", "jurisdiction", "domains", "citation", "effective_date", "date_added", "note"],
       "properties": {
         "law_id": { "type": "string" },
         "jurisdiction": { "type": "string" },
-        "domain": { "type": "string" },
+        "domains": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "matched_domains": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "domain": {
+          "type": "string",
+          "description": "Deprecated transitional mirror of matched_domains[0] for single-value consumers."
+        },
         "citation": { "type": "string" },
         "effective_date": { "type": "string" },
         "date_added": { "type": "string" },

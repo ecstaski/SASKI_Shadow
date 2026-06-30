@@ -1,6 +1,10 @@
 """Tests for the baseline analyzer pipeline using synthetic stub data only."""
 
+from unittest.mock import patch
+
 from saski_shadow.analyzer import analyze_turn
+from saski_shadow.analyzer.executor import MODE_TO_DOMAINS
+from saski_shadow.laws import match_laws
 
 TOKEN_EMAIL_A = "token-email-aaa-001"
 TOKEN_SSN_A = "token-ssn-aaa-001"
@@ -154,6 +158,7 @@ def test_no_domain_yields_empty_list_and_none_without_raising():
     summary = result.metadata["engine_summary"]
     assert summary["domains"] == []
     assert summary["domain"] is None
+    assert summary["domains_source"] == "none"
 
 
 def test_domains_precedence_over_domain_when_both_present():
@@ -163,3 +168,37 @@ def test_domains_precedence_over_domain_when_both_present():
     )
     assert result.domains == ["consumer_chatbot", "csam"]
     assert result.domain == "consumer_chatbot"
+    assert result.metadata["engine_summary"]["domains_source"] == "explicit"
+
+
+def test_mode_derives_domains_when_explicit_domain_absent():
+    result = analyze_turn(
+        "the purple widget hums quietly",
+        session_context={"user_jurisdiction": "US-NY"},
+        mode="mental_health_support",
+    )
+    assert result.domains == ["mental_health", "consumer_chatbot"]
+    assert result.metadata["engine_summary"]["domains_source"] == "mode_derived"
+    matched = match_laws("US-NY", result.domains)
+    ids = {law["law_id"] for law in matched}
+    assert "US-NY-AI-COMPANION" in ids
+
+
+def test_explicit_domain_overrides_mode_derived_domains():
+    result = analyze_turn(
+        "the purple widget hums quietly",
+        session_context={"domain": "employment", "user_jurisdiction": "US-NY-NYC"},
+        mode="child",
+    )
+    assert result.domains == ["employment"]
+    assert result.metadata["engine_summary"]["domains_source"] == "explicit"
+
+
+def test_unmapped_valid_mode_falls_back_to_consumer_chatbot():
+    with patch.dict(MODE_TO_DOMAINS, {}, clear=True):
+        result = analyze_turn(
+            "the purple widget hums quietly",
+            mode="patient",
+        )
+    assert result.domains == ["consumer_chatbot"]
+    assert result.metadata["engine_summary"]["domains_source"] == "mode_derived"

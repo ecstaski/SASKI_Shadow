@@ -69,7 +69,7 @@ def test_healthcare_pipeline_golden(tmp_path):
     _assert_common_credibility(report)
     # Negative: no wrong-domain laws, no US-NY-only laws.
     matched = _section(report, "compliance_exposure_examples")["matched_laws"]
-    assert all(law["domain"] == "healthcare" for law in matched)
+    assert all("healthcare" in law["matched_domains"] for law in matched)
     assert not any(law["law_id"].startswith("US-NY") for law in matched)
 
 
@@ -77,9 +77,9 @@ def test_ca_healthcare_cross_domain_isolation(tmp_path):
     # Gap 5: a US-CA / healthcare pipeline must not surface employment or csam.
     report = _run(tmp_path, _PHI_TEXT, {"user_jurisdiction": "US-CA", "domain": "healthcare"})
     matched = _section(report, "compliance_exposure_examples")["matched_laws"]
-    domains = {law["domain"] for law in matched}
-    assert "employment" not in domains
-    assert "csam" not in domains
+    matched_domains = {d for law in matched for d in law["matched_domains"]}
+    assert "employment" not in matched_domains
+    assert "csam" not in matched_domains
 
 
 def test_federal_healthcare_pipeline_only_federal_laws(tmp_path):
@@ -105,7 +105,7 @@ def test_consumer_chatbot_pipeline_golden(tmp_path):
     )
     matched = _section(report, "compliance_exposure_examples")["matched_laws"]
     assert matched
-    assert all(law["domain"] == "consumer_chatbot" for law in matched)
+    assert all("consumer_chatbot" in law["matched_domains"] for law in matched)
     _assert_common_credibility(report)
 
 
@@ -119,7 +119,7 @@ def test_employment_pipeline_golden(tmp_path):
     ids = _law_ids(report)
     assert "US-NYC-AEDT" in ids
     matched = _section(report, "compliance_exposure_examples")["matched_laws"]
-    assert all(law["domain"] == "employment" for law in matched)
+    assert all("employment" in law["matched_domains"] for law in matched)
     _assert_common_credibility(report)
 
 
@@ -132,7 +132,7 @@ def test_csam_pipeline_golden(tmp_path):
     )
     matched = _section(report, "compliance_exposure_examples")["matched_laws"]
     assert matched
-    assert all(law["domain"] == "csam" for law in matched)
+    assert all("csam" in law["matched_domains"] for law in matched)
     _assert_common_credibility(report)
 
 

@@ -238,9 +238,17 @@ def test_section2_names_specific_laws_on_jurisdiction_domain_match():
     assert section["law_match_summary"]["no_match_statement"] is None
     # Each matched law carries fact-only fields including the citation.
     first = section["matched_laws"][0]
-    assert set(first) == {
-        "law_id", "jurisdiction", "domain", "citation", "effective_date", "date_added", "note"
-    }
+    assert {
+        "law_id",
+        "jurisdiction",
+        "domains",
+        "matched_domains",
+        "domain",
+        "citation",
+        "effective_date",
+        "date_added",
+        "note",
+    }.issubset(set(first))
 
 
 def test_section2_surfaces_tier2_federal_laws_via_prefix_match():
@@ -294,7 +302,8 @@ def test_section2_example_attaches_signals_as_context_not_as_match_key():
     ]
     section = aggregate_shadow_report(turns)["sections"]["compliance_exposure_examples"]
     example = section["examples"][0]
-    assert example["matched_laws"][0]["law_id"] == "US-UT-MENTAL-HEALTH-CHATBOT"
+    matched_ids = {law["law_id"] for law in example["matched_laws"]}
+    assert "US-UT-MENTAL-HEALTH-CHATBOT" in matched_ids
     assert example["observed_signals"]["baseline_pii_signal"] is True
 
 
@@ -411,7 +420,44 @@ def test_section2_multi_domain_turn_surfaces_both_domain_buckets():
     section = aggregate_shadow_report([turn])["sections"]["compliance_exposure_examples"]
     unique = set(section["law_match_summary"]["unique_law_ids"])
     assert "US-COPPA" in unique  # consumer_chatbot
-    assert any(law["domain"] == "csam" for law in section["matched_laws"])
+    assert any("csam" in law["matched_domains"] for law in section["matched_laws"])
+
+
+def test_section2_mode_only_turn_derives_domains_and_matches_laws():
+    turn = {
+        "turn_index": 0,
+        "session_id": "sess_mh",
+        "jurisdiction": "US-NY",
+        "engine_summary": {
+            "outcome": "allow",
+            "mode": "mental_health_support",
+            "domains": ["mental_health", "consumer_chatbot"],
+            "domains_source": "mode_derived",
+        },
+    }
+    section = aggregate_shadow_report([turn])["sections"]["compliance_exposure_examples"]
+    assert section["law_match_summary"]["turns_with_law_match"] == 1
+    law = next(law for law in section["matched_laws"] if law["law_id"] == "US-NY-AI-COMPANION")
+    assert law["domains"] == ["consumer_chatbot", "mental_health"]
+    assert set(law["matched_domains"]) == {"consumer_chatbot", "mental_health"}
+
+
+def test_section2_mode_only_turn_via_report_mode_fallback():
+    # JSONL with mode but no explicit domain fields — report derives like analyze_turn.
+    turn = {
+        "turn_index": 0,
+        "session_id": "sess_mh_fallback",
+        "jurisdiction": "US-NY",
+        "engine_summary": {
+            "outcome": "allow",
+            "mode": "mental_health_support",
+        },
+    }
+    section = aggregate_shadow_report([turn])["sections"]["compliance_exposure_examples"]
+    assert section["law_match_summary"]["turns_with_law_match"] == 1
+    assert any(
+        law.get("matched_domains") for law in section["matched_laws"]
+    )
 
 
 # --- Task 4: report credibility additions -----------------------------------

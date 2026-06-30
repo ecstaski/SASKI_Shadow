@@ -1,10 +1,10 @@
 """Starter set of real US AI laws and a jurisdiction/domain matcher.
 
-Facts only: ``law_id``, ``jurisdiction``, ``domain``, ``citation``,
+Facts only: ``law_id``, ``jurisdiction``, ``domains``, ``citation``,
 ``effective_date``, ``date_added``, and a plain-language ``note``. No
 enforcement logic, no thresholds, no signal-to-statute trigger maps. Whether a
 law applies to a turn is decided solely by the integrator-supplied jurisdiction
-and domain.
+and domain(s).
 
 This file is a manually synced internal copy of ``laws.json`` from the
 ``saski-law-registry`` repo (https://github.com/ecstaski/saski-law-registry).
@@ -20,9 +20,9 @@ Jurisdiction matching is hierarchical on ``-`` segments: a law applies to a
 turn when the law's jurisdiction is an equal-or-broader prefix of the turn's.
 So a turn in ``US-NY-NYC`` matches laws scoped to ``US``, ``US-NY``, and
 ``US-NY-NYC``; a turn in ``US-NY`` does not match a city-specific
-``US-NY-NYC`` law. Domain matching is exact, and ``match_laws`` accepts either
-a single domain string or a list of domain strings so one turn can surface
-laws across multiple domains.
+``US-NY-NYC`` law. Domain matching is by set intersection: a law matches when
+any of its ``domains`` overlaps any session domain. ``match_laws`` accepts
+either a single domain string or a list of domain strings on the session side.
 """
 
 from __future__ import annotations
@@ -33,16 +33,16 @@ from typing import Any
 # the date of the last deliberate resync from saski-law-registry (documented in
 # SYNC.md / SHADOW_FOLLOWUP.md), not the date this file was last touched for
 # unrelated reasons. Update both when the law data is resynced.
-LAW_SET_VERSION = "2026.06.23"
-LAW_SET_SYNC_DATE = "2026-06-23"
+LAW_SET_VERSION = "2026.06.30"
+LAW_SET_SYNC_DATE = "2026-06-30"
 
 # Public law facts. ``law_id`` is an opaque label; ``jurisdiction`` is the
 # functional matching key. The two strings need not mirror each other.
-STARTER_LAWS: tuple[dict[str, str], ...] = (
+STARTER_LAWS: tuple[dict[str, Any], ...] = (
     {
         "law_id": "US-CA-COMPANION-CHATBOT",
         "jurisdiction": "US-CA",
-        "domain": "consumer_chatbot",
+        "domains": ["consumer_chatbot", "mental_health"],
         "citation": "Cal. Bus. & Prof. Code § 22601 et seq.",
         "effective_date": "2026-01-01",
         "date_added": "2026-06-17",
@@ -51,7 +51,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-NV-AI-MENTAL-HEALTH",
         "jurisdiction": "US-NV",
-        "domain": "mental_health",
+        "domains": ["mental_health", "healthcare"],
         "citation": "Nev. Rev. Stat. Ch. 433",
         "effective_date": "2025-07-01",
         "date_added": "2026-06-17",
@@ -60,7 +60,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-NY-AI-COMPANION",
         "jurisdiction": "US-NY",
-        "domain": "consumer_chatbot",
+        "domains": ["consumer_chatbot", "mental_health"],
         "citation": "NY Gen. Bus. Law Art. 47",
         "effective_date": "2025-11-05",
         "date_added": "2026-06-17",
@@ -69,7 +69,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-UT-MENTAL-HEALTH-CHATBOT",
         "jurisdiction": "US-UT",
-        "domain": "mental_health",
+        "domains": ["mental_health", "consumer_chatbot"],
         "citation": "Utah Code § 13-72a-101 et seq.",
         "effective_date": "2025-05-07",
         "date_added": "2026-06-17",
@@ -78,7 +78,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-ME-AI-CONSUMER-COMMS",
         "jurisdiction": "US-ME",
-        "domain": "consumer_chatbot",
+        "domains": ["consumer_chatbot"],
         "citation": "10 MRSA c. 239",
         "effective_date": "2025-09-24",
         "date_added": "2026-06-17",
@@ -87,7 +87,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-CA-BOT-ACT",
         "jurisdiction": "US-CA",
-        "domain": "consumer_chatbot",
+        "domains": ["consumer_chatbot"],
         "citation": "Cal. Bus. & Prof. Code § 17940-17943",
         "effective_date": "2019-07-01",
         "date_added": "2026-06-17",
@@ -96,7 +96,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-NJ-BOT-ACT",
         "jurisdiction": "US-NJ",
-        "domain": "consumer_chatbot",
+        "domains": ["consumer_chatbot"],
         "citation": "N.J. Rev. Stat. § 56:18-1 et seq.",
         "effective_date": "2020-07-19",
         "date_added": "2026-06-17",
@@ -105,7 +105,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-IL-WELLNESS-OVERSIGHT",
         "jurisdiction": "US-IL",
-        "domain": "mental_health",
+        "domains": ["mental_health"],
         "citation": "HB 1806",
         "effective_date": "2025-08-01",
         "date_added": "2026-06-17",
@@ -114,7 +114,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-TN-MENTAL-HEALTH-AI",
         "jurisdiction": "US-TN",
-        "domain": "mental_health",
+        "domains": ["mental_health"],
         "citation": "SB 1580",
         "effective_date": "2026-07-01",
         "date_added": "2026-06-17",
@@ -123,7 +123,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-CA-AB3030-HEALTH",
         "jurisdiction": "US-CA",
-        "domain": "healthcare",
+        "domains": ["healthcare", "mental_health", "consumer_chatbot"],
         "citation": "Cal. Health & Safety Code § 1339.75",
         "effective_date": "2025-01-01",
         "date_added": "2026-06-17",
@@ -132,7 +132,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-CA-HEALTH-ADVICE-AI",
         "jurisdiction": "US-CA",
-        "domain": "healthcare",
+        "domains": ["healthcare", "mental_health", "consumer_chatbot"],
         "citation": "Cal. Bus. & Prof. Code § 4999.9",
         "effective_date": "2026-01-01",
         "date_added": "2026-06-17",
@@ -141,7 +141,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-IL-AI-VIDEO-INTERVIEW",
         "jurisdiction": "US-IL",
-        "domain": "employment",
+        "domains": ["employment"],
         "citation": "820 ILCS 42",
         "effective_date": "2020-01-01",
         "date_added": "2026-06-17",
@@ -150,7 +150,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-NYC-AEDT",
         "jurisdiction": "US-NY-NYC",
-        "domain": "employment",
+        "domains": ["employment"],
         "citation": "NYC Local Law 144",
         "effective_date": "2023-01-01",
         "date_added": "2026-06-17",
@@ -159,7 +159,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-IA-CONVERSATIONAL-AI",
         "jurisdiction": "US-IA",
-        "domain": "consumer_chatbot",
+        "domains": ["consumer_chatbot", "mental_health"],
         "citation": "Iowa Code Chapter 554J",
         "effective_date": "2026-07-01",
         "date_added": "2026-06-17",
@@ -168,7 +168,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-GA-SB540",
         "jurisdiction": "US-GA",
-        "domain": "consumer_chatbot",
+        "domains": ["consumer_chatbot", "mental_health"],
         "citation": "O.C.G.A. § 39-5-6",
         "effective_date": "2027-07-01",
         "date_added": "2026-06-17",
@@ -177,7 +177,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-ID-CONVERSATIONAL-AI",
         "jurisdiction": "US-ID",
-        "domain": "consumer_chatbot",
+        "domains": ["consumer_chatbot", "mental_health"],
         "citation": "Idaho Code Chapter 21, Title 48 (Session Law Chapter 249, 2026)",
         "effective_date": "2027-07-01",
         "date_added": "2026-06-17",
@@ -186,7 +186,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-ME-THERAPY-AI",
         "jurisdiction": "US-ME",
-        "domain": "mental_health",
+        "domains": ["mental_health"],
         "citation": "HP 1397",
         "effective_date": "2026-07-14",
         "date_added": "2026-06-17",
@@ -195,7 +195,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-NE-CONVERSATIONAL-AI",
         "jurisdiction": "US-NE",
-        "domain": "consumer_chatbot",
+        "domains": ["consumer_chatbot", "mental_health"],
         "citation": "LB 525",
         "effective_date": "2027-07-01",
         "date_added": "2026-06-17",
@@ -204,7 +204,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-NH-RESPONSIVE-AI",
         "jurisdiction": "US-NH",
-        "domain": "consumer_chatbot",
+        "domains": ["consumer_chatbot", "mental_health"],
         "citation": "RSA 639:3",
         "effective_date": "2026-01-01",
         "date_added": "2026-06-17",
@@ -213,7 +213,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-OR-AI-COMPANIONS",
         "jurisdiction": "US-OR",
-        "domain": "consumer_chatbot",
+        "domains": ["consumer_chatbot", "mental_health"],
         "citation": "SB 1546",
         "effective_date": "2027-01-01",
         "date_added": "2026-06-17",
@@ -222,7 +222,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-UT-AI-CONSUMER-PROTECTION",
         "jurisdiction": "US-UT",
-        "domain": "consumer_chatbot",
+        "domains": ["consumer_chatbot"],
         "citation": "Utah Code § 13-75-101 to 106",
         "effective_date": "2025-05-07",
         "date_added": "2026-06-17",
@@ -231,7 +231,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-WA-AI-COMPANION-CHATBOTS",
         "jurisdiction": "US-WA",
-        "domain": "consumer_chatbot",
+        "domains": ["consumer_chatbot", "mental_health"],
         "citation": "HB 2225",
         "effective_date": "2027-01-01",
         "date_added": "2026-06-17",
@@ -240,7 +240,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-WY-SELFHARM-SYSTEMS",
         "jurisdiction": "US-WY",
-        "domain": "consumer_chatbot",
+        "domains": ["consumer_chatbot", "mental_health"],
         "citation": "Wy. Code § 6-4-701",
         "effective_date": "2026-07-01",
         "date_added": "2026-06-17",
@@ -249,7 +249,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-DE-MEDICAL-TITLES",
         "jurisdiction": "US-DE",
-        "domain": "healthcare",
+        "domains": ["healthcare"],
         "citation": "HB 191",
         "effective_date": "2026-04-23",
         "date_added": "2026-06-17",
@@ -258,7 +258,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-NV-AI-MENTAL-BEHAVIORAL-CARE",
         "jurisdiction": "US-NV",
-        "domain": "mental_health",
+        "domains": ["mental_health", "healthcare"],
         "citation": "Nev. Rev. Stat. Chapter 629",
         "effective_date": "2025-07-01",
         "date_added": "2026-06-17",
@@ -267,7 +267,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-TX-AI-EHR-DISCLOSURE",
         "jurisdiction": "US-TX",
-        "domain": "healthcare",
+        "domains": ["healthcare", "consumer_chatbot"],
         "citation": "Tex. Bus. & Com. Code § 552.051",
         "effective_date": "2025-09-01",
         "date_added": "2026-06-17",
@@ -276,7 +276,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-CA-EMPLOYMENT-ADS",
         "jurisdiction": "US-CA",
-        "domain": "employment",
+        "domains": ["employment"],
         "citation": "Civil Rights Council Employment Regulations Regarding Automated-Decision Systems",
         "effective_date": "2025-10-01",
         "date_added": "2026-06-17",
@@ -285,7 +285,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-IL-HUMAN-RIGHTS-AI",
         "jurisdiction": "US-IL",
-        "domain": "employment",
+        "domains": ["employment"],
         "citation": "HB 3773",
         "effective_date": "2026-01-01",
         "date_added": "2026-06-17",
@@ -294,7 +294,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-NJ-DISPARATE-IMPACT",
         "jurisdiction": "US-NJ",
-        "domain": "employment",
+        "domains": ["employment"],
         "citation": "N.J.A.C. 13:16",
         "effective_date": "2025-12-15",
         "date_added": "2026-06-17",
@@ -303,7 +303,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-AL-CSAM",
         "jurisdiction": "US-AL",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "HB 168",
         "effective_date": "2024-10-01",
         "date_added": "2026-06-17",
@@ -312,7 +312,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-AR-CSAM",
         "jurisdiction": "US-AR",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "HB1877",
         "effective_date": "2025-07-21",
         "date_added": "2026-06-17",
@@ -321,7 +321,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-CA-CSAM",
         "jurisdiction": "US-CA",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "Cal. Penal Code §§ 311-312.7",
         "effective_date": "2025-01-01",
         "date_added": "2026-06-17",
@@ -330,7 +330,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-CO-CSAM",
         "jurisdiction": "US-CO",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "C.R.S. § 13-21-1501",
         "effective_date": "2025-08-06",
         "date_added": "2026-06-17",
@@ -339,7 +339,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-FL-CSAM",
         "jurisdiction": "US-FL",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "SB 1680",
         "effective_date": "2025-01-01",
         "date_added": "2026-06-17",
@@ -348,7 +348,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-GA-CSAM",
         "jurisdiction": "US-GA",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "SB 466",
         "effective_date": "2024-07-01",
         "date_added": "2026-06-17",
@@ -357,7 +357,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-IA-CSAM",
         "jurisdiction": "US-IA",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "Iowa Code § 728.12",
         "effective_date": "2024-07-01",
         "date_added": "2026-06-17",
@@ -366,7 +366,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-KY-CSAM",
         "jurisdiction": "US-KY",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "KRS 17.500, 531.300-370",
         "effective_date": "2024-07-15",
         "date_added": "2026-06-17",
@@ -375,7 +375,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-LA-CSAM",
         "jurisdiction": "US-LA",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "La. Rev. Stat. Ann. § 14:73.13",
         "effective_date": "2023-08-01",
         "date_added": "2026-06-17",
@@ -384,7 +384,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-MD-CSAM",
         "jurisdiction": "US-MD",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "Md. Code, Crim. Law § 11-208",
         "effective_date": "2023-10-01",
         "date_added": "2026-06-17",
@@ -393,7 +393,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-MN-CSAM",
         "jurisdiction": "US-MN",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "Minn. Stat. § 617.246",
         "effective_date": "2025-08-01",
         "date_added": "2026-06-17",
@@ -402,7 +402,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-MO-CSAM",
         "jurisdiction": "US-MO",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "R.S.Mo § 573.010",
         "effective_date": "2006-06-05",
         "date_added": "2026-06-17",
@@ -411,7 +411,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-NE-CSAM",
         "jurisdiction": "US-NE",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "Neb. Rev. Stat. §§ 28-1463.01 to 28-1463.06",
         "effective_date": "2025-05-20",
         "date_added": "2026-06-17",
@@ -420,7 +420,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-NC-CSAM",
         "jurisdiction": "US-NC",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "G.S. 14-190.17C and G.S. 14-202.7",
         "effective_date": "2024-12-01",
         "date_added": "2026-06-17",
@@ -429,7 +429,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-ND-CSAM",
         "jurisdiction": "US-ND",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "N.D. Cent. Code §§ 12.1-27.2-01, -04.1",
         "effective_date": "2025-08-01",
         "date_added": "2026-06-17",
@@ -438,7 +438,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-OK-CSAM",
         "jurisdiction": "US-OK",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "21 O.S. §§ 1021.2, 1024.1",
         "effective_date": "2024-11-01",
         "date_added": "2026-06-17",
@@ -447,7 +447,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-PA-CSAM",
         "jurisdiction": "US-PA",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "18 Pa.C.S. § 6312",
         "effective_date": "2024-12-28",
         "date_added": "2026-06-17",
@@ -456,7 +456,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-SD-CSAM",
         "jurisdiction": "US-SD",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "SB 79",
         "effective_date": "2024-07-01",
         "date_added": "2026-06-17",
@@ -465,7 +465,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-TN-CSAM",
         "jurisdiction": "US-TN",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "Tenn. Code Ann. Title 39",
         "effective_date": "2024-07-01",
         "date_added": "2026-06-17",
@@ -474,7 +474,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-TX-CSAM-2700",
         "jurisdiction": "US-TX",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "Tex. Penal Code § 43.26",
         "effective_date": "2023-09-01",
         "date_added": "2026-06-17",
@@ -483,7 +483,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-TX-CSAM-1621",
         "jurisdiction": "US-TX",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "Tex. Penal Code §§ 43.26, 21.16",
         "effective_date": "2025-09-01",
         "date_added": "2026-06-17",
@@ -492,7 +492,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-TX-CSAM-VISUAL",
         "jurisdiction": "US-TX",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "Tex. Penal Code § 43.235",
         "effective_date": "2025-09-01",
         "date_added": "2026-06-17",
@@ -501,7 +501,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-UT-CSAM-148",
         "jurisdiction": "US-UT",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "Utah Code § 76-5b-203",
         "effective_date": "2024-05-01",
         "date_added": "2026-06-17",
@@ -510,7 +510,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-UT-CSAM-238",
         "jurisdiction": "US-UT",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "Utah Code § 76-5b-201.1",
         "effective_date": "2024-05-01",
         "date_added": "2026-06-17",
@@ -519,7 +519,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-VA-CSAM",
         "jurisdiction": "US-VA",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "Va. Code Ann. § 18.2-374.1",
         "effective_date": "2024-07-01",
         "date_added": "2026-06-17",
@@ -528,7 +528,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-WA-CSAM",
         "jurisdiction": "US-WA",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "RCW 9.68A",
         "effective_date": "2024-06-06",
         "date_added": "2026-06-17",
@@ -537,7 +537,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-WV-CSAM",
         "jurisdiction": "US-WV",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "W. Va. Code § 61-8C-3a",
         "effective_date": "2025-07-09",
         "date_added": "2026-06-17",
@@ -546,7 +546,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-WI-CSAM",
         "jurisdiction": "US-WI",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "Wis. Stat. § 948.12(4)",
         "effective_date": "2024-03-29",
         "date_added": "2026-06-17",
@@ -555,7 +555,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-WY-CSAM-303",
         "jurisdiction": "US-WY",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "Wy. Code § 6-4-303",
         "effective_date": "2007-07-01",
         "date_added": "2026-06-17",
@@ -564,7 +564,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-WY-CSAM-306",
         "jurisdiction": "US-WY",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "Wy. Code § 6-4-306",
         "effective_date": "2021-07-01",
         "date_added": "2026-06-17",
@@ -573,7 +573,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-WY-CSAM-DEEPFAKE",
         "jurisdiction": "US-WY",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "Wy. Code §§ 6-4-303, 6-4-308",
         "effective_date": "2026-07-01",
         "date_added": "2026-06-17",
@@ -582,7 +582,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-FTC-ACT-5",
         "jurisdiction": "US",
-        "domain": "consumer_chatbot",
+        "domains": ["consumer_chatbot"],
         "citation": "15 U.S.C. § 45(a)",
         "effective_date": "1914-09-26",
         "date_added": "2026-06-22",
@@ -591,7 +591,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-COPPA",
         "jurisdiction": "US",
-        "domain": "consumer_chatbot",
+        "domains": ["consumer_chatbot"],
         "citation": "15 U.S.C. §§ 6501–6506; 16 CFR Part 312",
         "effective_date": "2025-06-23",
         "date_added": "2026-06-22",
@@ -600,7 +600,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-CSAM-CORE",
         "jurisdiction": "US",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "18 U.S.C. §§ 2251, 2252, 2252A, 2256",
         "effective_date": "1978-02-06",
         "date_added": "2026-06-22",
@@ -609,7 +609,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-CSAM-REPORTING",
         "jurisdiction": "US",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "18 U.S.C. § 2258A",
         "effective_date": "2008-10-13",
         "date_added": "2026-06-22",
@@ -618,7 +618,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-CSAM-TAKE-IT-DOWN",
         "jurisdiction": "US",
-        "domain": "csam",
+        "domains": ["csam"],
         "citation": "Pub. L. 119-12; 47 U.S.C. § 223(h) (criminal prohibition); 47 U.S.C. § 223a (platform notice-and-removal duty)",
         "effective_date": "2025-05-19",
         "date_added": "2026-06-22",
@@ -627,7 +627,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-TITLE-VII",
         "jurisdiction": "US",
-        "domain": "employment",
+        "domains": ["employment"],
         "citation": "42 U.S.C. § 2000e et seq.; 29 CFR Part 1607 (Uniform Guidelines on Employee Selection Procedures)",
         "effective_date": "1965-07-02",
         "date_added": "2026-06-22",
@@ -636,7 +636,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-ADA-TITLE-I",
         "jurisdiction": "US",
-        "domain": "employment",
+        "domains": ["employment"],
         "citation": "42 U.S.C. §§ 12111–12117; 29 CFR Part 1630",
         "effective_date": "1992-07-26",
         "date_added": "2026-06-22",
@@ -645,7 +645,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-HIPAA",
         "jurisdiction": "US",
-        "domain": "healthcare",
+        "domains": ["healthcare"],
         "citation": "42 U.S.C. §§ 1320d et seq.; 45 CFR Parts 160 & 164",
         "effective_date": "2001-04-14",
         "date_added": "2026-06-22",
@@ -654,7 +654,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-FTC-HBNR",
         "jurisdiction": "US",
-        "domain": "healthcare",
+        "domains": ["healthcare"],
         "citation": "16 CFR Part 318",
         "effective_date": "2024-07-29",
         "date_added": "2026-06-23",
@@ -663,7 +663,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-42-CFR-PART-2",
         "jurisdiction": "US",
-        "domain": "healthcare",
+        "domains": ["healthcare", "mental_health"],
         "citation": "42 CFR Part 2; 42 U.S.C. § 290dd-2",
         "effective_date": "2024-04-16",
         "date_added": "2026-06-23",
@@ -672,7 +672,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-ADEA",
         "jurisdiction": "US",
-        "domain": "employment",
+        "domains": ["employment"],
         "citation": "29 U.S.C. §§ 621–634",
         "effective_date": "1967-06-12",
         "date_added": "2026-06-23",
@@ -681,7 +681,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-FCRA",
         "jurisdiction": "US",
-        "domain": "employment",
+        "domains": ["employment"],
         "citation": "15 U.S.C. §§ 1681 et seq.",
         "effective_date": "1970-04-25",
         "date_added": "2026-06-23",
@@ -690,7 +690,7 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-ACA-1557",
         "jurisdiction": "US",
-        "domain": "healthcare",
+        "domains": ["healthcare"],
         "citation": "42 U.S.C. § 18116; 45 CFR Part 92",
         "effective_date": "2024-07-05",
         "date_added": "2026-06-23",
@@ -699,14 +699,13 @@ STARTER_LAWS: tuple[dict[str, str], ...] = (
     {
         "law_id": "US-NY-MH-OVERSIGHT",
         "jurisdiction": "US-NY",
-        "domain": "mental_health",
+        "domains": ["mental_health"],
         "citation": "S.8484 / A.9106, 2025-2026 New York State Legislature (proposed N.Y. Education Law § 6517)",
         "effective_date": None,
         "date_added": "2026-06-24",
         "note": "This pending bill would amend New York's Education Law to bar any person or entity from offering therapy or psychotherapy to the public — including through internet-based artificial intelligence — unless the care is delivered by a licensed professional. A licensed professional could use AI only for administrative or supplementary tasks and would be prohibited from allowing AI to make independent therapeutic decisions, to interact directly with clients in therapeutic communication, or to generate treatment recommendations without the professional's review and approval. Where AI assists during a recorded or transcribed session, the patient must be informed in writing of the specific purpose and provide consent, and violations would carry civil penalties of up to $50,000 each.",
     },
 )
-
 
 def _jurisdiction_applies(law_jurisdiction: str, turn_jurisdiction: str) -> bool:
     """True when law_jurisdiction is an equal-or-broader prefix of the turn's."""
@@ -717,14 +716,46 @@ def _jurisdiction_applies(law_jurisdiction: str, turn_jurisdiction: str) -> bool
     return law_parts == turn_parts[: len(law_parts)]
 
 
-def match_laws(jurisdiction: Any, domain: Any) -> list[dict[str, str]]:
-    """Return starter laws matching a turn's jurisdiction (hierarchical) and domain(s) (exact).
+def _law_domains(law: dict[str, Any]) -> set[str]:
+    """Return a law entry's domain tags (``domains`` list or legacy ``domain`` string)."""
+    plural = law.get("domains")
+    if isinstance(plural, list):
+        return {d for d in plural if isinstance(d, str) and d}
+    single = law.get("domain")
+    if isinstance(single, str) and single:
+        return {single}
+    return set()
+
+
+def _enrich_matched_law(law: dict[str, Any], overlap: set[str]) -> dict[str, Any]:
+    """Attach report-facing domain fields to a matched law copy."""
+    out = dict(law)
+    law_tags = _law_domains(law)
+    domains_list = sorted(law_tags)
+    matched_list = sorted(overlap)
+    if domains_list:
+        out["domains"] = domains_list
+    if matched_list:
+        out["matched_domains"] = matched_list
+        # Deprecated/transitional: first overlapping domain for single-value consumers.
+        out["domain"] = matched_list[0]
+    return out
+
+
+def match_laws(jurisdiction: Any, domain: Any) -> list[dict[str, Any]]:
+    """Return starter laws matching a turn's jurisdiction (hierarchical) and domain(s).
 
     ``domain`` accepts either a single domain string or a list of domain
     strings. A single string is treated as a one-element list, so a child-facing
     turn can surface laws across multiple domains in one call (for example
     ``["consumer_chatbot", "csam"]`` returns both COPPA and the CSAM statutes).
-    Jurisdiction matching remains hierarchical; domain matching remains exact.
+    Jurisdiction matching remains hierarchical. Law-side matching is by set
+    intersection between session domains and each law's ``domains`` (or legacy
+    ``domain`` string).
+
+    Each matched law dict includes ``domains`` (the law's full tag list),
+    ``matched_domains`` (the intersection that triggered the match), and a
+    deprecated ``domain`` mirror of ``matched_domains[0]``.
 
     Returns an empty list when the jurisdiction is missing, no usable domain is
     supplied, or nothing matches. Results are deduplicated by ``law_id`` and
@@ -745,12 +776,13 @@ def match_laws(jurisdiction: Any, domain: Any) -> list[dict[str, str]]:
         return []
 
     domain_set = set(domains)
-    matched_by_id: dict[str, dict[str, str]] = {}
+    matched_by_id: dict[str, dict[str, Any]] = {}
     for law in STARTER_LAWS:
-        if law["domain"] in domain_set and _jurisdiction_applies(
-            law["jurisdiction"], jurisdiction
-        ):
-            matched_by_id.setdefault(law["law_id"], dict(law))
+        overlap = _law_domains(law) & domain_set
+        if overlap and _jurisdiction_applies(law["jurisdiction"], jurisdiction):
+            matched_by_id.setdefault(
+                law["law_id"], _enrich_matched_law(law, overlap)
+            )
 
     return [matched_by_id[law_id] for law_id in sorted(matched_by_id)]
 
@@ -773,9 +805,10 @@ def coverage_summary() -> dict[str, Any]:
     for law in STARTER_LAWS:
         st = _state_of(law["jurisdiction"])
         all_states.add(st)
-        bucket = domains.setdefault(law["domain"], {"laws": 0, "states": set()})
-        bucket["laws"] += 1
-        bucket["states"].add(st)
+        for tag in _law_domains(law):
+            bucket = domains.setdefault(tag, {"laws": 0, "states": set()})
+            bucket["laws"] += 1
+            bucket["states"].add(st)
 
     by_domain = {
         domain: {"laws": bucket["laws"], "states": len(bucket["states"])}

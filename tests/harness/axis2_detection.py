@@ -123,9 +123,9 @@ def test_csam_and_employment_surface_domain_laws_via_result_passthrough():
             session_context={"user_jurisdiction": jurisdiction, "domain": domain},
         )
         summary = result.metadata["engine_summary"]
-        matched = match_laws(summary["user_jurisdiction"], summary["domain"])
+        matched = match_laws(summary["user_jurisdiction"], summary["domains"] or summary["domain"])
         assert matched, f"no laws surfaced for {domain}"
-        assert all(law["domain"] == domain for law in matched)
+        assert all(domain in law["matched_domains"] for law in matched)
 
 
 # --- Gap 3: mode coverage ---------------------------------------------------

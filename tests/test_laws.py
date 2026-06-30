@@ -1,6 +1,7 @@
 """Tests for the starter law set and the jurisdiction/domain matcher."""
 
 import pathlib
+from unittest.mock import patch
 
 from saski_shadow.laws import STARTER_LAWS, coverage_summary, match_laws
 
@@ -28,7 +29,7 @@ def test_starter_set_has_expected_count_and_fact_only_fields():
     required = {
         "law_id",
         "jurisdiction",
-        "domain",
+        "domains",
         "citation",
         "effective_date",
         "date_added",
@@ -36,6 +37,8 @@ def test_starter_set_has_expected_count_and_fact_only_fields():
     }
     for law in STARTER_LAWS:
         assert set(law) == required
+        assert isinstance(law["domains"], list)
+        assert law["domains"]
 
 
 def test_law_ids_are_unique():
@@ -59,17 +62,16 @@ def test_exact_state_domain_match_names_specific_law():
 
 
 def test_domain_must_match_exactly():
-    # CA has chatbot, healthcare, and employment laws, but no mental_health law.
-    #
-    # TODO(Gap 5 / registry resync): this assertion must be updated AFTER the
-    # registry adds the two California mental-health duplicate entries
-    # (US-CA-AB3030-HEALTH-MH and US-CA-HEALTH-ADVICE-AI-MH, domain=mental_health)
-    # and that change is resynced into starter.py. See SYNC.md "Pending Registry
-    # Changes". The registry change must happen first; do not flip this assertion
-    # before starter.py actually carries those entries, or this test will lie.
-    # After the resync, expect match_laws("US-CA", "mental_health") to return
-    # those two -MH law ids instead of [].
-    assert match_laws("US-CA", "mental_health") == []
+    # CA mental_health turns surface multi-domain CA laws whose ``domains`` include
+    # ``mental_health`` (no duplicate -MH law entries after registry migration).
+    matched = match_laws("US-CA", "mental_health")
+    ids = {law["law_id"] for law in matched}
+    assert ids == {
+        "US-CA-AB3030-HEALTH",
+        "US-CA-COMPANION-CHATBOT",
+        "US-CA-HEALTH-ADVICE-AI",
+        "US-42-CFR-PART-2",
+    }
 
 
 def test_nyc_turn_matches_both_city_and_state_laws():
@@ -116,14 +118,14 @@ def test_single_string_domain_still_works():
     # Backward compatibility: a single domain string behaves as before.
     matched = match_laws("US", "csam")
     assert matched
-    assert all(law["domain"] == "csam" for law in matched)
+    assert all("csam" in law["matched_domains"] for law in matched)
 
 
 def test_list_of_domains_returns_laws_from_each_domain():
     matched = match_laws("US", ["consumer_chatbot", "csam"])
-    domains = {law["domain"] for law in matched}
-    assert "consumer_chatbot" in domains
-    assert "csam" in domains
+    matched_domains = {d for law in matched for d in law["matched_domains"]}
+    assert "consumer_chatbot" in matched_domains
+    assert "csam" in matched_domains
 
 
 def test_child_turn_surfaces_both_coppa_and_a_csam_statute():
@@ -132,10 +134,44 @@ def test_child_turn_surfaces_both_coppa_and_a_csam_statute():
     matched = match_laws("US", ["consumer_chatbot", "csam"])
     ids = {law["law_id"] for law in matched}
     assert "US-COPPA" in ids
-    assert any(law["domain"] == "csam" for law in matched)
+    assert any("csam" in law["matched_domains"] for law in matched)
 
 
 def test_multi_domain_results_have_no_duplicate_law_ids():
     matched = match_laws("US", ["consumer_chatbot", "csam", "consumer_chatbot"])
     ids = [law["law_id"] for law in matched]
     assert len(ids) == len(set(ids))
+
+
+def test_matched_law_includes_domains_and_matched_domains_fields():
+    matched = match_laws("US-NV", "mental_health")
+    assert matched
+    law = matched[0]
+    assert isinstance(law["domains"], list)
+    assert law["domains"]
+    assert law["matched_domains"] == ["mental_health"]
+    assert law["domain"] == "mental_health"
+
+
+def test_intersection_matching_multi_domain_law_entry():
+    multi = {
+        "law_id": "TEST-MULTI-DOMAIN-LAW",
+        "jurisdiction": "US-NY",
+        "domains": ["consumer_chatbot", "mental_health"],
+        "citation": "Test citation",
+        "effective_date": "2025-01-01",
+        "date_added": "2026-01-01",
+        "note": "Synthetic multi-domain entry for intersection coverage.",
+    }
+    with patch(
+        "saski_shadow.laws.starter.STARTER_LAWS",
+        STARTER_LAWS + (multi,),
+    ):
+        matched = match_laws("US-NY", "mental_health")
+    by_id = {law["law_id"]: law for law in matched}
+    assert "TEST-MULTI-DOMAIN-LAW" in by_id
+    assert by_id["TEST-MULTI-DOMAIN-LAW"]["matched_domains"] == ["mental_health"]
+    assert by_id["TEST-MULTI-DOMAIN-LAW"]["domains"] == [
+        "consumer_chatbot",
+        "mental_health",
+    ]
