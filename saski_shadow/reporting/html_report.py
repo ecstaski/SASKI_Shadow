@@ -477,7 +477,8 @@ def _render_latency(s: dict[str, Any]) -> str:
     agg = s.get("aggregate", {})
     html = _section_open(
         "7. Latency Impact Report",
-        "Per-turn pipeline latency observed during the run.",
+        "Per-turn SASKI pipeline latency observed during the run "
+        "(excludes LLM provider round-trip).",
     )
     html += '<div class="stat-grid">'
     html += _stat(agg.get("turn_count"), "Turns timed")
