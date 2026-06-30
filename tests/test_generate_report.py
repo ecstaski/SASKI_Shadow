@@ -18,6 +18,24 @@ def _gr_main():
     return main
 
 
+def _flags_for_turn():
+    """Import _flags_for_turn, adding repo root to sys.path first."""
+    import sys
+
+    repo = pathlib.Path(__file__).resolve().parent.parent
+    if str(repo) not in sys.path:
+        sys.path.insert(0, str(repo))
+    from scripts._session_common import _flags_for_turn  # noqa: E402
+
+    return _flags_for_turn
+
+
+def _truncated(reply: str) -> bool:
+    """True if a non-error anthropic reply fires TRUNCATED_RESPONSE."""
+    flags = _flags_for_turn()({"reply": reply}, "anthropic")
+    return "TRUNCATED_RESPONSE" in flags
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -226,6 +244,45 @@ def test_pricing_populates_prospect_inputs(tmp_path):
     assert section["prospect_inputs"]["legacy_system_prompt_tokens"] == 450.0
     # 2 clean non-regulated turns: each saves 450-103=347 -> 694.
     assert section["savings"]["tokens_saved_estimate"] == 694.0
+
+
+def test_truncated_response_fires_on_long_reply_ending_on_comma():
+    # A 1041-char crisis-style reply cut off mid-sentence on a comma — the exact
+    # failure that previously slipped through the old length<200 gate.
+    body = (
+        "I'm genuinely concerned about what you're sharing. Please reach out to "
+        "someone right now. Help exists and people have gotten through this. "
+    )
+    reply = (body * 10)[:1040].rstrip() + ","
+    assert len(reply) > 200
+    assert reply.endswith(",")
+    assert _truncated(reply) is True
+
+
+def test_truncated_response_does_not_fire_when_ending_with_period():
+    reply = (
+        "Here is a complete and properly terminated response that ends "
+        "with a period."
+    )
+    assert _truncated(reply) is False
+
+
+def test_truncated_response_does_not_fire_on_ellipsis():
+    reply = "Let me think about that for a moment..."
+    assert _truncated(reply) is False
+    # Single-character ellipsis glyph is also a terminal ending.
+    assert _truncated("Still considering the options…") is False
+
+
+def test_truncated_response_fires_on_empty_reply():
+    assert _truncated("") is True
+    assert _truncated("   \n  ") is True
+
+
+def test_truncated_response_guard_allows_url_and_code_tails():
+    # Trailing URL/path or code-continuation chars are legitimate endings.
+    assert _truncated("See https://example.com/resources/crisis/") is False
+    assert _truncated("Run the command flag --dry-run -") is False
 
 
 def test_pricing_accepts_wrapped_prospect_inputs(tmp_path):
