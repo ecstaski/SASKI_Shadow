@@ -14,10 +14,16 @@ from html import escape
 from typing import Any
 
 BRAND = "SASKI Institute PBC"
-CONTACT_LINE = "Contact SASKI Institute PBC \u00b7 info@techviz.us \u00b7 www.techviz.us"
+SHADOW_REPORT_EMAIL = "shadowreport@saski.io"
+SUPPORT_EMAIL = "support@saski.io"
+WEBSITE = "www.saski.io"
+CONTACT_LINE = (
+    f"Contact {BRAND} \u00b7 Reports: {SHADOW_REPORT_EMAIL} \u00b7 "
+    f"Support: {SUPPORT_EMAIL} \u00b7 {WEBSITE}"
+)
 FOOTER_LINE = (
-    "\u00a9 2026 SASKI Institute PBC \u00b7 Baseline shadow observation report "
-    "\u00b7 Not clinical-grade \u00b7 info@techviz.us"
+    f"\u00a9 2026 {BRAND} \u00b7 Baseline shadow observation report "
+    f"\u00b7 Not clinical-grade \u00b7 {SHADOW_REPORT_EMAIL}"
 )
 OBSERVATION_BANNER = (
     "Observation-only report. In shadow mode SASKI observed this traffic; it did "
@@ -294,6 +300,8 @@ def _render_pii(s: dict[str, Any]) -> str:
 
     if s.get("baseline_only_caveat"):
         html += f'<div class="note">{_esc(s["baseline_only_caveat"])}</div>'
+    if s.get("observation_note"):
+        html += f'<div class="note">{_esc(s["observation_note"])}</div>'
     return html + "</section>"
 
 
@@ -315,15 +323,20 @@ _BASIS_LABELS = {
 }
 
 _UNSAFE_FLOW_LABELS = {
-    "enforcement_would_block": "Enforcement Would Block",
-    "policy_boundary_failure": "Policy Boundary Failure",
-    "content_sanitization_gap": "Content Sanitization Gap",
-    "integrator_override": "Integrator Override",
-    "manual_review_required": "Manual Review Required",
+    "enforcement_would_block": "Would Block in Enforce Mode",
+    "policy_boundary_failure": "Policy Boundary Failure (observed)",
+    "content_sanitization_gap": "Output Sanitization Gap (observed)",
+    "integrator_override": "Integrator Override (observed)",
+    "manual_review_required": "Manual Review Would Apply",
     "adversarial_probe": "Adversarial Probe Detected",
     "clinical_intent_boundary": "Clinical Boundary Request",
     "other": "Other",
 }
+
+_REDACTION_WOULD_APPLY_NOTE = (
+    '"Yes" means PII was detected that would be redacted under production '
+    "enforcement — not that redaction occurred during this shadow pilot."
+)
 
 
 def _render_compliance(s: dict[str, Any]) -> str:
@@ -378,8 +391,9 @@ def _render_token_savings(s: dict[str, Any]) -> str:
     inputs = s.get("prospect_inputs", {})
     html = _section_open(
         "3. Token Savings Calculation",
-        "Estimate computed by transparent arithmetic from two integrator inputs "
-        "applied to observed governance tiers. Dollar figures are never computed.",
+        "Hypothetical savings estimate from integrator inputs and observed tier "
+        "counts in shadow mode. Your live traffic was not modified. Dollar "
+        "figures are never computed.",
     )
     basis_raw = s.get("basis")
     basis_label = _BASIS_LABELS.get(str(basis_raw), str(basis_raw or ""))
@@ -413,7 +427,7 @@ def _render_token_savings(s: dict[str, Any]) -> str:
             "Warning append tokens (warning context append)",
             model.get("warning_append_tokens"),
         ),
-        ("Tier 3 LLM tokens (enforce mode)", model.get("tier3_llm_tokens")),
+        ("Tier 3 LLM tokens (hypothetical — enforce mode)", model.get("tier3_llm_tokens")),
         ("Tokens saved — Clean turns", savings.get("tier_clean_tokens_saved")),
         ("Tokens saved — Warning turns", savings.get("tier_warning_tokens_saved")),
         ("Tokens saved — Escalation turns", savings.get("tier_escalation_tokens_saved")),
@@ -447,8 +461,8 @@ def _render_envelope(s: dict[str, Any]) -> str:
     samples = s.get("samples", []) or []
     html = _section_open(
         "4. Envelope Evidence Sample",
-        "Representative transport envelopes captured during observation (hashed, "
-        "no message contents).",
+        "Representative transport envelopes from shadow observation (hashed, "
+        "no message contents). Your live LLM traffic was not modified.",
     )
     if not samples:
         html += '<p class="empty">No envelope samples captured.</p>'
@@ -466,8 +480,11 @@ def _render_envelope(s: dict[str, Any]) -> str:
         )
     html += (
         "<table><tr><th class='num'>Turn</th><th>Session</th><th>Mode tag</th>"
-        f"<th>PII types</th><th>Redaction applied</th></tr>{rows}</table>"
+        f"<th>PII types</th><th>Redaction would apply</th></tr>{rows}</table>"
     )
+    if s.get("observation_note"):
+        html += f'<div class="note">{_esc(s["observation_note"])}</div>'
+    html += f'<div class="note">{_esc(_REDACTION_WOULD_APPLY_NOTE)}</div>'
     return html + "</section>"
 
 

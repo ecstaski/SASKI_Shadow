@@ -84,7 +84,8 @@ def test_renders_all_nine_sections_and_cover():
 def test_branding_is_saski_institute_pbc_only():
     html = render_html_report(_report())
     assert "SASKI Institute PBC" in html
-    assert "info@techviz.us" in html
+    assert "shadowreport@saski.io" in html
+    assert "support@saski.io" in html
     assert "Technical Visionaries" not in html
 
 
@@ -92,8 +93,16 @@ def test_observation_only_language_present_no_enforcement_claims():
     html = render_html_report(_report())
     assert "did not block, modify, or suppress" in html
     assert "Absence of a finding is not evidence of compliance." in html
+    assert "Redaction would apply" in html
+    assert "Your live LLM traffic was not modified" in html
     lowered = html.lower()
-    for forbidden in ("we blocked", "we redacted", "we enforced", "we prevented"):
+    for forbidden in (
+        "we blocked",
+        "we redacted",
+        "we enforced",
+        "we prevented",
+        "redaction applied</th>",
+    ):
         assert forbidden not in lowered
 
 

@@ -1,10 +1,10 @@
 {
-  "_comment": "Copy this file to pricing.json and fill in your own numbers. Pass prospect_inputs programmatically via aggregate_shadow_report() or the saski-shadow aggregate CLI --config flag. pricing.json is gitignored so your figures never get committed. All values are token counts you supply; this package computes no dollar figure.",
+  "_comment": "Copy to pricing.json and fill in your numbers. Token fields must live under prospect_inputs when using saski-shadow aggregate --config. pricing.json is gitignored in this repo's dev layout. All values are token counts you supply; this package computes no dollar figure.",
 
-  "legacy_system_prompt_tokens": 450,
-  "lean_product_prompt_tokens": 103,
-
-  "_optional_advanced_overrides": "The two keys below are optional. If omitted, documented defaults are used (regulated_mode_floor_tokens=85, warning_append_tokens=50).",
-  "regulated_mode_floor_tokens": 85,
-  "warning_append_tokens": 50
+  "prospect_inputs": {
+    "legacy_system_prompt_tokens": 450,
+    "lean_product_prompt_tokens": 103,
+    "regulated_mode_floor_tokens": 85,
+    "warning_append_tokens": 50
+  }
 }

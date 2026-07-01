@@ -191,7 +191,7 @@ def test_every_emitted_signal_has_correct_contact():
     sis = _report(turns)["sections"]["sdk_integration_signals"]
     assert sis["signals"], "expected at least one signal"
     for sig in sis["signals"]:
-        assert sig["contact"] == "info@techviz.us", (
+        assert sig["contact"] == "support@saski.io", (
             f"{sig['signal_id']} has wrong contact: {sig['contact']!r}"
         )
 

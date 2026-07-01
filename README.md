@@ -131,6 +131,50 @@ pip install "saski-shadow[saski-sdk]"
 
 ---
 
+## Data stays on your infrastructure
+
+`saski-shadow` makes **no outbound network calls** at runtime. There is no
+account, API key, telemetry endpoint, or automatic upload to SASKI Institute.
+Shadow turn stores (`*.jsonl`), aggregated reports (`report.json`), and HTML
+reports are written only to paths **you** configure on your own machines.
+
+Persisted turn records from `result_to_jsonl_turn()` are **hash-only** by
+design — no raw user or assistant message text in the default JSONL pipeline.
+You control retention, access, and whether any file ever leaves your
+environment.
+
+**We cannot see your shadow pilot traffic** unless you choose to share
+artifacts with us separately.
+
+### Optional feedback (voluntary)
+
+If you are comfortable doing so, you may email aggregate pilot artifacts to
+[shadowreport@saski.io](mailto:shadowreport@saski.io) to help us improve shadow mode and
+the licensed SASKI product. This is **entirely optional** and never required to
+use the package.
+
+For integration questions or issues, contact
+[support@saski.io](mailto:support@saski.io).
+
+Helpful to share:
+
+- Aggregated `report.json` or `report.html` from a completed pilot
+- Schema version (`shadow_report_v1`) and a short integration note (jurisdiction,
+  domains, approximate turn count)
+
+These outputs contain counts, hashes, and compliance metadata — not message
+contents. Default `shadow_turns.jsonl` from this package is also hash-only, but
+only share it if you have verified your integration did not add raw text fields.
+
+Please **do not** email raw conversation logs, unredacted user content, or
+`pricing.json` (your local token-cost inputs). If you need a formal data-sharing
+arrangement, contact us first.
+
+We use voluntary submissions only for product improvement unless you ask for
+follow-up.
+
+---
+
 ## Law Coverage
 
 Shadow mode ships a small, transparent starter 
@@ -219,8 +263,8 @@ AI is safe from violating laws not listed here. The
 licensed SASKI engine provides broader, continuously 
 maintained, clinical-grade enforcement. Contact 
 SASKI Institute at 
-[info@techviz.us](mailto:info@techviz.us) or 
-[www.techviz.us](https://www.techviz.us) to request 
+[support@saski.io](mailto:support@saski.io) or 
+[www.saski.io](https://www.saski.io) to request 
 a licensed SDK evaluation.
 
 ---

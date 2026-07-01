@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.9"
 authors = [
-  { name = "SASKI Institute PBC", email = "info@techviz.us" }
+  { name = "SASKI Institute PBC", email = "support@saski.io" }
 ]
 keywords = ["ai-safety", "shadow-mode", "audit", "evidence", "compliance"]
 classifiers = [
@@ -45,7 +45,7 @@ saski-sdk = [
 saski-shadow = "saski_shadow.aggregate.report:main"
 
 [project.urls]
-Homepage = "https://mytrusted.ai"
+Homepage = "https://www.saski.io"
 Repository = "https://github.com/mytrustedai/saski-shadow"
 Documentation = "https://github.com/mytrustedai/saski-shadow#readme"
 

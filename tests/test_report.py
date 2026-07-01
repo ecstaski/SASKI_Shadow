@@ -358,6 +358,42 @@ def test_cli_aggregate_with_config_populates_token_savings(tmp_path):
     assert section["savings"]["tokens_saved_estimate"] is not None
 
 
+def test_cli_aggregate_with_flat_top_level_token_config(tmp_path):
+    input_path = tmp_path / "turns.jsonl"
+    output_path = tmp_path / "report.json"
+    config_path = tmp_path / "pricing.json"
+
+    with open(input_path, "w", encoding="utf-8") as handle:
+        for turn in _sample_turns():
+            handle.write(json.dumps(turn) + "\n")
+    config_path.write_text(
+        json.dumps(
+            {
+                "legacy_system_prompt_tokens": 450,
+                "lean_product_prompt_tokens": 103,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    rc = main(
+        [
+            "aggregate",
+            "--input",
+            str(input_path),
+            "--output",
+            str(output_path),
+            "--config",
+            str(config_path),
+        ]
+    )
+    assert rc == 0
+    report = json.loads(output_path.read_text(encoding="utf-8"))
+    section = report["sections"]["token_savings_calculation"]
+    assert section["basis"] == "estimated_from_integrator_inputs"
+    assert section["savings"]["tokens_saved_estimate"] is not None
+
+
 # --- Task 2: future-effective law split -------------------------------------
 
 
@@ -592,4 +628,4 @@ def test_next_steps_derived_from_session_signals():
 def test_next_steps_always_includes_contact_line():
     report = aggregate_shadow_report([_turn(0, "sess_clean")])
     next_steps = report["sections"]["recommended_path"]["next_steps"]
-    assert any("info@techviz.us" in step for step in next_steps)
+    assert any("support@saski.io" in step for step in next_steps)

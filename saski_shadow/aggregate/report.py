@@ -27,6 +27,10 @@ from ..laws import (
     match_laws,
 )
 
+SHADOW_REPORT_EMAIL = "shadowreport@saski.io"
+SUPPORT_EMAIL = "support@saski.io"
+WEBSITE = "www.saski.io"
+
 # Required messaging strings.
 COMPLIANCE_DISCLAIMER = (
     "This report reflects a starter set of laws and will expand as coverage "
@@ -37,7 +41,7 @@ COMPLIANCE_DISCLAIMER = (
 )
 UPGRADE_MESSAGE = (
     "For comprehensive results, add the licensed SASKI engine to your VPC deployment. "
-    "Contact SASKI Institute at info@techviz.us or www.techviz.us."
+    f"Contact SASKI Institute at {SUPPORT_EMAIL} or {WEBSITE}."
 )
 ESCALATION_DISCLAIMER = (
     "Escalation counts reflect baseline distress phrase-list matches only and are "
@@ -49,7 +53,7 @@ TOKEN_SAVINGS_DISCLAIMER = (
     "lean_product_prompt_tokens) applied to the governance-tier counts observed "
     "in shadow mode. It embeds no proprietary SASKI prompt-assembly logic beyond "
     "two documented, observable defaults: a regulated-mode safety-envelope floor "
-    "(applied on governed turns for child, patient, and therapist modes) and a "
+    "(assumed in the estimate for governed child, patient, and therapist modes) and a "
     "fixed warning append. Tier 3 (escalation) turns are counted as the full "
     "legacy cost avoided, because in enforce mode the LLM call would not be made. "
     "No LLM egress was suppressed during this session - shadow observed, it did "
@@ -78,6 +82,14 @@ DETECTION_LIMITATIONS = [
 # a clean bill of health.
 BASELINE_ONLY_CAVEAT = (
     "Baseline detection only. Absence of a finding is not evidence of compliance."
+)
+SHADOW_OBSERVATION_NOTE = (
+    "Shadow observation only. Signals describe what production enforcement would "
+    "do; your live LLM traffic was not modified, blocked, or redacted."
+)
+SHADOW_MODE_NOTE = (
+    "Shadow mode only: no enforcement or redaction was applied to your live "
+    "traffic. Token savings reflect hypothetical production behavior."
 )
 
 # Section 3 basis labels: makes it explicit whether numbers were calculated.
@@ -252,6 +264,8 @@ def _section_pii(turns: list[dict[str, Any]], period: dict[str, Any]) -> dict[st
     }
     if turns_with_pii == 0:
         section["baseline_only_caveat"] = BASELINE_ONLY_CAVEAT
+    else:
+        section["observation_note"] = SHADOW_OBSERVATION_NOTE
     return section
 
 
@@ -538,7 +552,7 @@ def _section_token_savings(
             "tier_escalation_turns": tier_counts["tier_escalation"],
             "regulated_mode_turns": regulated_turns,
             "would_have_blocked_turns": blocked,
-            "shadow_mode_note": "enforcement not applied; counts reflect would_block signals only",
+            "shadow_mode_note": SHADOW_MODE_NOTE,
         },
         "token_model": {
             "regulated_modes": list(_REGULATED_MODES),
@@ -571,7 +585,11 @@ def _section_envelope_sample(turns: list[dict[str, Any]]) -> dict[str, Any]:
                 "transport_audit_record": turn.get("transport_audit_record") or {},
             }
         )
-    return {"section": "envelope_evidence_sample", "samples": samples}
+    return {
+        "section": "envelope_evidence_sample",
+        "observation_note": SHADOW_OBSERVATION_NOTE,
+        "samples": samples,
+    }
 
 
 def _section_escalation(turns: list[dict[str, Any]]) -> dict[str, Any]:
@@ -677,12 +695,20 @@ def _section_unsafe_flows(turns: list[dict[str, Any]]) -> dict[str, Any]:
         review = turn.get("output_review") or {}
 
         if summary.get("would_block"):
-            _record(turn, "enforcement_would_block", "Block LLM egress; serve governed template")
+            _record(
+                turn,
+                "enforcement_would_block",
+                "In enforce mode: block LLM egress; serve governed template",
+            )
         elif outcome == PublicOutcome.HUMAN_REVIEW.value:
             _record(turn, "manual_review_required", "Route turn to a human reviewer")
 
         if review.get("pii_leaked_types"):
-            _record(turn, "content_sanitization_gap", "Re-run output sanitization before egress")
+            _record(
+                turn,
+                "content_sanitization_gap",
+                "In enforce mode: redact or block model output with PII before egress",
+            )
         if review.get("policy_boundary_hits"):
             _record(turn, "policy_boundary_failure", "Review integrator policy boundary handling")
 
@@ -849,7 +875,7 @@ def _section_recommended_path(
             "before effective dates."
         )
     next_steps.append(
-        "Contact info@techviz.us to configure the licensed SASKI SDK for production enforcement."
+        f"Contact {SUPPORT_EMAIL} to configure the licensed SASKI SDK for production enforcement."
     )
 
     if escalation_turns > 0:
@@ -965,7 +991,7 @@ def _section_sdk_integration_signals(
                     "requiring integrator-supplied indicator lists."
                 ),
                 "affected_turns": escalation_turns,
-                "contact": "info@techviz.us",
+                "contact": SUPPORT_EMAIL,
             }
         )
 
@@ -987,12 +1013,12 @@ def _section_sdk_integration_signals(
                 "sdk_recommendation": (
                     "Review the future_effective law list and verify your SDK jurisdiction "
                     "configuration will be updated before each law's effective date. "
-                    "Contact info@techviz.us for registry update notifications."
+                    f"Contact {SUPPORT_EMAIL} for registry update notifications."
                 ),
                 "affected_turns": compliance_section["law_match_summary"][
                     "turns_with_law_match"
                 ],
-                "contact": "info@techviz.us",
+                "contact": SUPPORT_EMAIL,
             }
         )
 
@@ -1015,7 +1041,7 @@ def _section_sdk_integration_signals(
                     "misconfigured domain metadata may result in missed obligations."
                 ),
                 "affected_turns": multi_domain_turns,
-                "contact": "info@techviz.us",
+                "contact": SUPPORT_EMAIL,
             }
         )
 
@@ -1041,7 +1067,7 @@ def _section_sdk_integration_signals(
                     "your deployment."
                 ),
                 "affected_turns": turns_with_pii,
-                "contact": "info@techviz.us",
+                "contact": SUPPORT_EMAIL,
             }
         )
 
@@ -1060,11 +1086,11 @@ def _section_sdk_integration_signals(
                 ),
                 "sdk_recommendation": (
                     "Run the shadow compliance harness with cross-domain negative tests "
-                    "before production deployment. Contact info@techviz.us for integration "
+                    f"before production deployment. Contact {SUPPORT_EMAIL} for integration "
                     "validation support."
                 ),
                 "affected_turns": total_turns,
-                "contact": "info@techviz.us",
+                "contact": SUPPORT_EMAIL,
             }
         )
 
@@ -1088,7 +1114,7 @@ def _section_sdk_integration_signals(
                     "production deployment."
                 ),
                 "affected_turns": 0,
-                "contact": "info@techviz.us",
+                "contact": SUPPORT_EMAIL,
             }
         )
 
@@ -1220,13 +1246,34 @@ def aggregate_shadow_report(
     }
 
 
+_TOKEN_CONFIG_KEYS = (
+    "legacy_system_prompt_tokens",
+    "lean_product_prompt_tokens",
+    "regulated_mode_floor_tokens",
+    "warning_append_tokens",
+)
+
+
+def _normalize_config(data: dict[str, Any]) -> dict[str, Any]:
+    """Hoist top-level token fields into ``prospect_inputs`` when omitted."""
+    prospect_inputs = data.get("prospect_inputs")
+    if isinstance(prospect_inputs, dict):
+        return data
+    hoisted = {key: data[key] for key in _TOKEN_CONFIG_KEYS if key in data}
+    if not hoisted:
+        return data
+    return {**data, "prospect_inputs": hoisted}
+
+
 def _load_config(path: str | None) -> dict[str, Any]:
     """Load an optional runtime config (pricing/token-model/period) JSON.
 
     Recognized keys: ``prospect_inputs`` (dict, includes the token model and
     pricing fields used by the token-savings section), ``latency_targets``
-    (dict), ``period_start_utc`` and ``period_end_utc`` (strings). Unknown keys
-    are ignored. Everything is integrator-supplied; there are no defaults.
+    (dict), ``period_start_utc`` and ``period_end_utc`` (strings). Token model
+    keys may also appear at the top level; they are hoisted into
+    ``prospect_inputs`` automatically. Unknown keys are ignored. Everything is
+    integrator-supplied; there are no defaults.
     """
     if not path:
         return {}
@@ -1234,7 +1281,7 @@ def _load_config(path: str | None) -> dict[str, Any]:
         data = json.load(handle)
     if not isinstance(data, dict):
         raise ValueError("Config file must contain a JSON object at the top level.")
-    return data
+    return _normalize_config(data)
 
 
 def main(argv: list[str] | None = None) -> int:

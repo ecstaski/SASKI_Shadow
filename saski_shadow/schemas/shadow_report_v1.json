@@ -145,6 +145,7 @@
       "properties": {
         "section": { "type": "string", "const": "pii_phi_detection_summary" },
         "baseline_only_caveat": { "type": "string" },
+        "observation_note": { "type": "string" },
         "period": {
           "type": "object",
           "properties": {
@@ -366,6 +367,7 @@
       "required": ["section", "samples"],
       "properties": {
         "section": { "type": "string", "const": "envelope_evidence_sample" },
+        "observation_note": { "type": "string" },
         "samples": {
           "type": "array",
           "items": {
