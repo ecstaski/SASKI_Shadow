@@ -30,9 +30,9 @@ from __future__ import annotations
 from typing import Any
 
 # Version stamp for this manually synced starter set. ``LAW_SET_SYNC_DATE`` is
-# the date of the last deliberate resync from saski-law-registry (documented in
-# SYNC.md / SHADOW_FOLLOWUP.md), not the date this file was last touched for
-# unrelated reasons. Update both when the law data is resynced.
+# the date of the last deliberate resync from saski-law-registry, not the date
+# this file was last touched for unrelated reasons. Update both when the law
+# data is resynced (maintainer sync process; not published in this repo).
 LAW_SET_VERSION = "2026.06.30"
 LAW_SET_SYNC_DATE = "2026-06-30"
 

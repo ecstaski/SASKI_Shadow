@@ -1,6 +1,6 @@
 """Render a shadow_report_v1 dict into a self-contained HTML document.
 
-Design constraints (see docs/CUSTOMER_REPORT_STANDARDS.md):
+Design constraints:
   * Observation-only language throughout. Shadow observed traffic; it did not
     block, modify, or suppress any LLM output. No enforcement is claimed.
   * Self-contained: inline CSS only, no external fonts/scripts/images.
@@ -25,7 +25,7 @@ OBSERVATION_BANNER = (
     "evidence of compliance."
 )
 
-# Color palette (documented in CUSTOMER_REPORT_STANDARDS.md).
+# Color palette for customer-facing HTML reports.
 _CSS = """
 :root {
   --navy: #1f2a44;

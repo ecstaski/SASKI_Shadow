@@ -35,6 +35,10 @@ internal_findings.log
 # a template; the real pricing.json stays local and is never committed.
 pricing.json
 
+# Maintainer-only documentation (not published to the public repo)
+SYNC.md
+CUSTOMER_REPORT_STANDARDS.md
+
 # Maintainer-only dev artifacts (never ship to the public repo)
 scripts/run_session.py
 scripts/generate_report.py
