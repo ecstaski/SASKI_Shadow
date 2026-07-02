@@ -18,7 +18,7 @@ _PHI_TEXT = "My SSN is 123-45-6789 and email me at patient@example.com about res
 _METHODOLOGY_KEYS = {
     "detector_profile",
     "law_set_version",
-    "law_set_sync_date",
+    "law_set_date",
     "total_laws_evaluated",
     "total_jurisdictions",
     "schema_version",

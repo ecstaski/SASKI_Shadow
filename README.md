@@ -39,7 +39,7 @@ Report sections and what they honestly promise:
 | Section | What the baseline delivers |
 |---------|---------------------------|
 | PII and PHI Detection | Counts and redacts obvious US identifier patterns — SSN, phone, email, credit card, date of birth, insurance ID, address, IP. Not HIPAA Safe Harbor complete. |
-| Compliance Exposure | Flags turns that match your own policy rules, and names public US AI laws by jurisdiction and domain from a transparent starter set (see Law Coverage). No built-in statute *enforcement*. |
+| Compliance Exposure | Flags turns that match your own policy rules, and names public US AI laws by jurisdiction and domain when you supply that metadata (see [INTEGRATION.md](INTEGRATION.md#required-metadata-for-compliance-matching)). No built-in statute *enforcement*. |
 | Token Savings | Arithmetic estimate of tokens saved from your observed tier counts and two integrator-supplied token inputs. Reports tokens only — never a dollar figure. |
 | Cryptographic Evidence | Full structural accuracy — deterministic hashes, artifact chain, schema-valid envelope. This is the strongest section. |
 | Escalation Signals | Counts conservative public distress phrase matches. Not clinical crisis detection. |
@@ -115,9 +115,9 @@ pip install "saski-shadow[saski-sdk]"
   or crisis detection.
 - Does not ship the full statute enforcement 
   database or any proprietary compliance logic — 
-  it matches a transparent starter set of public 
-  law facts for exposure awareness only (see 
-  Law Coverage below).
+  it names public law facts for exposure awareness 
+  only when you supply jurisdiction and domain 
+  metadata (see [INTEGRATION.md](INTEGRATION.md#required-metadata-for-compliance-matching)).
 - Does not reproduce any proprietary scoring, 
   thresholds, or detection methodology.
 - Does not make network calls, download models, 
@@ -175,97 +175,15 @@ follow-up.
 
 ---
 
-## Law Coverage
+## Compliance exposure
 
-Shadow mode ships a small, transparent starter 
-set of **public US AI law facts** (identifiers, 
-jurisdictions, domains, citations, effective 
-dates, and plain-language notes). It matches 
-those facts to a turn purely by integrator-supplied 
-jurisdiction and domain. It does **not** ship the 
-enforcement mappings, thresholds, or routing logic 
-that the licensed SASKI engine uses.
+Section 2 of the shadow report names **public US AI law facts** when you supply
+`user_jurisdiction` and `domain`/`domains` on each turn. Matching is by
+jurisdiction prefix and domain intersection only — not inferred from message
+content. This is exposure awareness, not statute enforcement or legal advice.
 
-The exact figures below are derived from the 
-starter set itself (`saski_shadow.laws.coverage_summary`) 
-and are verified by a test, so they stay accurate 
-as the set grows.
-
-**Geographic scope:** shadow mode currently covers 
-US state and federal AI laws only — it does not yet 
-include EU, UK, or other non-US jurisdictions. If EU 
-coverage is added in the future, it will go through 
-the same inventory-and-verification process used for 
-the US laws here, not be added piecemeal.
-
-### What's included
-
-**74 laws across 36 U.S. state-level and federal jurisdictions**, 
-grouped by the per-message signal they relate to:
-
-| Coverage area | Domain | Count |
-| --- | --- | --- |
-| Conversational AI & companion-chatbot disclosure and safety | `consumer_chatbot` | 20 laws / 15 states |
-| AI-generated CSAM | `csam` | 34 laws / 27 states |
-| AI employment & hiring discrimination | `employment` | 9 laws / 5 states |
-| AI claiming clinical credentials (mental/behavioral health) | `mental_health` | 20 laws / 16 states |
-| AI claiming credentials or communicating directly with patients | `healthcare` | 10 laws / 5 states |
-
-The set includes **13 federal (`US`) laws** that apply across every US 
-jurisdiction in their domain. In the figures above, federal `US` is 
-counted as a single jurisdiction alongside the state-level ones.
-
-Matching is by jurisdiction prefix: a federal `US` entry matches any 
-US-prefixed turn (`US-CA`, `US-NY-NYC`, and so on) in the relevant 
-domain. So a `US-CA` healthcare turn surfaces both the California 
-state healthcare laws and the federal healthcare laws (HIPAA, 
-ACA § 1557, and others), while a state-scoped entry like `US-CA` 
-matches only `US-CA` turns and narrower.
-
-The healthcare-related entries are a deliberately 
-**focused subset**: laws about AI claiming a license 
-or credential it doesn't hold, or communicating 
-directly with patients as if it were a provider — 
-the things a text-only conversational layer can 
-actually observe per message.
-
-### What's explicitly NOT included, and why
-
-- **Generic consumer-privacy "automated 
-  decision-making" opt-out laws.** These apply to 
-  any business processing personal data for 
-  automated decisions, not specifically to 
-  conversational AI, and there is no per-message 
-  signal that distinguishes a chatbot from any 
-  other data-processing company.
-- **AI healthcare laws governing insurance claims 
-  and utilization-review decision systems.** Those 
-  regulate a different class of AI system than 
-  conversational text and are out of scope for 
-  this product.
-- **Requirements that are organizational policy 
-  rather than per-message checks** (e.g., audit, 
-  governance, or record-retention mandates). There 
-  is nothing to detect in a single turn.
-- **Anything requiring image, audio, or video 
-  watermark detection or embedding.** This is a 
-  text-only safety middleware.
-- **Any law not yet reviewed.** This is a growing 
-  starter set, not a claim of exhaustive coverage.
-
-### The core message
-
-Shadow mode is a free, open-source, zero-dependency 
-baseline detector for **compliance exposure 
-awareness**. It is **not** a substitute for legal 
-review, and using it does not mean an integrator's 
-AI is safe from violating laws not listed here. The 
-licensed SASKI engine provides broader, continuously 
-maintained, clinical-grade enforcement. Contact 
-SASKI Institute at 
-[support@saski.io](mailto:support@saski.io) or 
-[www.saski.io](https://www.saski.io) to request 
-a licensed SDK evaluation.
+Required metadata, valid domain tags, and CSAM upstream wiring are documented in
+**[INTEGRATION.md](INTEGRATION.md)**.
 
 ---
 

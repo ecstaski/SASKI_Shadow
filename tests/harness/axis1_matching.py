@@ -5,8 +5,8 @@ domains in ``STARTER_LAWS``. Covers the systematic gaps that involve law
 matching: jurisdiction coverage (gap 1), federal-only turns (gap 4),
 cross-domain isolation (gap 5), and future-effective bucketing (gap 6).
 
-All expectations are derived from the live registry data, never hardcoded, so
-these tests stay correct as the starter set grows.
+All expectations are derived from the live starter law set, never hardcoded, so
+these tests stay correct as the set grows.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from saski_shadow.aggregate.report import _split_laws_by_effective_date, _today_
 from saski_shadow.laws import STARTER_LAWS, coverage_summary, match_laws
 from saski_shadow.laws.starter import _law_domains
 
-# Derived golden tables (single source of truth: the registry itself).
+# Derived golden tables (single source of truth: STARTER_LAWS).
 _PAIRS = sorted(
     {
         (law["jurisdiction"], domain)
@@ -47,8 +47,8 @@ def test_every_jurisdiction_domain_pair_returns_at_least_one_law():
 
 
 def test_every_distinct_jurisdiction_has_some_coverage():
-    # Every jurisdiction present in the registry must match in at least one of
-    # its own domains. Reported as a list so genuine registry gaps are visible.
+    # Every jurisdiction present in the starter set must match in at least one of
+    # its own domains. Reported as a list so genuine coverage gaps are visible.
     uncovered = []
     for jur in _DISTINCT_JURISDICTIONS:
         domains = {
@@ -149,8 +149,8 @@ def test_future_and_in_force_laws_bucket_correctly():
     # Read effective dates from the data; do not hardcode.
     future_laws = [law for law in STARTER_LAWS if _is_future(law["effective_date"])]
     past_laws = [law for law in STARTER_LAWS if not _is_future(law["effective_date"])]
-    assert future_laws, "registry has no future-effective laws to validate against"
-    assert past_laws, "registry has no in-force laws to validate against"
+    assert future_laws, "starter set has no future-effective laws to validate against"
+    assert past_laws, "starter set has no in-force laws to validate against"
 
     sample = future_laws + past_laws
     in_force, future = _split_laws_by_effective_date(sample, today)

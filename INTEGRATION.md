@@ -2,7 +2,7 @@
 
 This guide is for application developers wiring shadow mode into a
 conversational AI product (sandbox or production pilot). It assumes Python 3
-on your backend. For package overview and law coverage, see [README.md](README.md).
+on your backend. For package overview, see [README.md](README.md).
 
 Shadow mode **observes** traffic only. It does not block, modify, or suppress
 LLM output. Use `DeploymentMode.SHADOW` during a pilot so user-facing behavior

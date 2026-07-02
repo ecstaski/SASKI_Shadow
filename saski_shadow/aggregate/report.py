@@ -20,7 +20,7 @@ from typing import Any
 from ..enums import PublicOutcome
 from ..analyzer.executor import _normalize_domains
 from ..laws import (
-    LAW_SET_SYNC_DATE,
+    LAW_SET_DATE,
     LAW_SET_VERSION,
     STARTER_LAWS,
     coverage_summary,
@@ -871,8 +871,8 @@ def _section_recommended_path(
         )
     if future_effective_count > 0:
         next_steps.append(
-            "Future-effective laws matched — schedule registry update reviews "
-            "before effective dates."
+            "Future-effective laws matched — review obligations before each "
+            "law's effective date."
         )
     next_steps.append(
         f"Contact {SUPPORT_EMAIL} to configure the licensed SASKI SDK for production enforcement."
@@ -1011,9 +1011,9 @@ def _section_sdk_integration_signals(
                     "on their effective dates."
                 ),
                 "sdk_recommendation": (
-                    "Review the future_effective law list and verify your SDK jurisdiction "
-                    "configuration will be updated before each law's effective date. "
-                    f"Contact {SUPPORT_EMAIL} for registry update notifications."
+                    "Review the future_effective law list and verify your "
+                    "jurisdiction configuration will be updated before each "
+                    "law's effective date."
                 ),
                 "affected_turns": compliance_section["law_match_summary"][
                     "turns_with_law_match"
@@ -1226,7 +1226,7 @@ def aggregate_shadow_report(
     methodology = {
         "detector_profile": "baseline-v1",
         "law_set_version": LAW_SET_VERSION,
-        "law_set_sync_date": LAW_SET_SYNC_DATE,
+        "law_set_date": LAW_SET_DATE,
         "total_laws_evaluated": len(STARTER_LAWS),
         "total_jurisdictions": coverage["total_states"],
         "schema_version": "shadow_report_v1",

@@ -1,20 +1,10 @@
-"""Starter set of real US AI laws and a jurisdiction/domain matcher.
+"""Starter set of public US AI law facts and a jurisdiction/domain matcher.
 
 Facts only: ``law_id``, ``jurisdiction``, ``domains``, ``citation``,
 ``effective_date``, ``date_added``, and a plain-language ``note``. No
 enforcement logic, no thresholds, no signal-to-statute trigger maps. Whether a
 law applies to a turn is decided solely by the integrator-supplied jurisdiction
 and domain(s).
-
-This file is a manually synced internal copy of ``laws.json`` from the
-``saski-law-registry`` repo (https://github.com/ecstaski/saski-law-registry).
-It is NOT a live runtime dependency — no network calls are made. When the
-registry updates, this file must be resynced as a deliberate manual step.
-
-``date_added`` records when an entry was added to this set so reviewers can
-tell at a glance which laws have not been rechecked in a while. New entries in
-future batches should carry their own actual date rather than reusing an older
-backfill date.
 
 Jurisdiction matching is hierarchical on ``-`` segments: a law applies to a
 turn when the law's jurisdiction is an equal-or-broader prefix of the turn's.
@@ -29,12 +19,8 @@ from __future__ import annotations
 
 from typing import Any
 
-# Version stamp for this manually synced starter set. ``LAW_SET_SYNC_DATE`` is
-# the date of the last deliberate resync from saski-law-registry, not the date
-# this file was last touched for unrelated reasons. Update both when the law
-# data is resynced (maintainer sync process; not published in this repo).
 LAW_SET_VERSION = "2026.06.30"
-LAW_SET_SYNC_DATE = "2026-06-30"
+LAW_SET_DATE = "2026-06-30"
 
 # Public law facts. ``law_id`` is an opaque label; ``jurisdiction`` is the
 # functional matching key. The two strings need not mirror each other.

@@ -28,7 +28,7 @@
       "properties": {
         "detector_profile": { "type": "string" },
         "law_set_version": { "type": "string" },
-        "law_set_sync_date": { "type": "string" },
+        "law_set_date": { "type": "string" },
         "total_laws_evaluated": { "type": "integer", "minimum": 0 },
         "total_jurisdictions": { "type": "integer", "minimum": 0 },
         "schema_version": { "type": "string" },

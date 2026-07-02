@@ -507,7 +507,7 @@ def test_methodology_block_present_with_all_keys():
     assert set(methodology) == {
         "detector_profile",
         "law_set_version",
-        "law_set_sync_date",
+        "law_set_date",
         "total_laws_evaluated",
         "total_jurisdictions",
         "schema_version",

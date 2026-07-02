@@ -11,7 +11,7 @@ The starter set is intentionally small and will expand as coverage grows.
 from __future__ import annotations
 
 from .starter import (
-    LAW_SET_SYNC_DATE,
+    LAW_SET_DATE,
     LAW_SET_VERSION,
     STARTER_LAWS,
     coverage_summary,
@@ -21,7 +21,7 @@ from .starter import (
 __all__ = [
     "STARTER_LAWS",
     "LAW_SET_VERSION",
-    "LAW_SET_SYNC_DATE",
+    "LAW_SET_DATE",
     "coverage_summary",
     "match_laws",
 ]
